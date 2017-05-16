@@ -1,0 +1,10 @@
+{"ts":"2009-11-10T23:00:00Z", "user":"A", "url":"events.com/home"}
+{"ts":"2009-11-10T23:05:00Z", "user":"A", "url":"events.com/sports"}
+{"ts":"2009-11-10T23:07:00Z", "user":"A", "url":"events.com/world"}
+{"ts":"2009-11-10T23:11:00Z", "user":"A", "url":"events.com/national"}
+{"ts":"2009-11-11T07:23:00Z", "user":"B", "url":"events.com/home"}
+{"ts":"2009-11-11T07:24:00Z", "user":"B", "url":"events.com/sports"}
+{"ts":"2009-11-11T07:30:00Z", "user":"B", "url":"events.com/regional"}
+{"ts":"2010-01-03T12:11:00Z", "user":"A", "url":"events.com/sports"}
+{"ts":"2010-01-03T12:12:00Z", "user":"A", "url":"events.com/world"}
+{"ts":"2010-01-03T12:23:00Z", "user":"A", "url":"events.com/national"}

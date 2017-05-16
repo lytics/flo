@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package msg;
+
+message Unit {
+	bytes ID = 1;
+	bytes data = 2;
+	string from = 3;
+}
+
+message Keyed {
+	string key = 1;
+	bytes data = 2;
+	string dataType = 3;
+	int64 unix = 4;
+	string graph = 6;
+}
