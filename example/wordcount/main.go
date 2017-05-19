@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/md5"
 	"fmt"
 	"net"
 	"os"
@@ -13,17 +12,14 @@ import (
 	"github.com/lytics/flo"
 	"github.com/lytics/flo/graph"
 	"github.com/lytics/flo/source/linefile"
+	"github.com/lytics/flo/source/md5id"
 	"github.com/lytics/flo/trigger"
 	"github.com/lytics/flo/window"
 )
 
-func ErrUnknownType(msg string, v interface{}) error {
-	return fmt.Errorf("main: %v: unknown type: %T", msg, v)
-}
-
 func main() {
 	g := graph.New("wordcount")
-	g.From(linefile.New("words.txt"))
+	g.From(linefile.FromFile("words.txt"))
 	g.Transform(clean)
 	g.GroupBy(word)
 	g.Merger(adder)
@@ -53,40 +49,30 @@ func main() {
 	op.Stop()
 }
 
-func clean(w interface{}) ([]graph.Event, error) {
-	switch w := w.(type) {
-	case string:
-		w = strings.Trim(w, "\n.!@#$%^&*()")
-		ss := strings.Split(w, " ")
-		ws := []graph.Event{}
-		for _, s := range ss {
-			if s == "" {
-				continue
-			}
-			h := md5.New()
-			h.Write([]byte(s))
-			ws = append(ws, graph.Event{
-				TS: time.Now(),
-				ID: string(h.Sum(nil)),
-				Msg: &Word{
-					Text:  s,
-					Count: 1,
-				},
-			})
+func clean(v interface{}) ([]graph.Event, error) {
+	line := v.(string)
+	line = strings.Trim(line, "\n.!@#$%^&*()")
+	words := strings.Split(line, " ")
+
+	ws := []graph.Event{}
+	for _, w := range words {
+		if w == "" {
+			continue
 		}
-		return ws, nil
-	default:
-		return nil, ErrUnknownType("clean", w)
+		ws = append(ws, graph.Event{
+			TS: time.Now(),
+			ID: md5id.FromString(w),
+			Msg: &Word{
+				Text:  w,
+				Count: 1,
+			},
+		})
 	}
+	return ws, nil
 }
 
 func word(w interface{}) (string, error) {
-	switch w := w.(type) {
-	case *Word:
-		return w.Text, nil
-	default:
-		return "", ErrUnknownType("word", w)
-	}
+	return w.(*Word).Text, nil
 }
 
 func adder(a, b interface{}) (interface{}, error) {
@@ -96,14 +82,8 @@ func adder(a, b interface{}) (interface{}, error) {
 	if b == nil {
 		return a, nil
 	}
-	aw, ok := a.(*Word)
-	if !ok {
-		return nil, ErrUnknownType("adder", a)
-	}
-	bw, ok := b.(*Word)
-	if !ok {
-		return nil, ErrUnknownType("adder", b)
-	}
+	aw := a.(*Word)
+	bw := b.(*Word)
 
 	aw.Combine(bw)
 	return aw, nil
@@ -111,13 +91,7 @@ func adder(a, b interface{}) (interface{}, error) {
 
 func printer(span window.Span, key string, vs []interface{}) error {
 	for _, v := range vs {
-		w, ok := v.(*Word)
-		if !ok {
-			return ErrUnknownType("printer", v)
-		}
-		if key != w.Text {
-			panic("text and key do not match")
-		}
+		w := v.(*Word)
 		fmt.Printf("word: %20v, count: %10d, time window: %v\n", w.Text, w.Count, span)
 	}
 	return nil

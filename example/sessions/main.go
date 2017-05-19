@@ -17,13 +17,15 @@ import (
 	"github.com/lytics/flo/window"
 )
 
-func ErrUnknownType(msg string, v interface{}) error {
-	return fmt.Errorf("main: %v: unknown type: %T", msg, v)
+type Entry struct {
+	Timestamp string `json:"ts"`
+	User      string `json:"user"`
+	URL       string `json:"url"`
 }
 
 func main() {
-	g := flo.New(flo.GraphCfg{Name: "events"})
-	g.From(jsonfile.FromObjects(Entry{}, "event.data"))
+	g := graph.New("events")
+	g.From(jsonfile.FromFile(Entry{}, "event.data"))
 	g.Transform(clean)
 	g.GroupBy(user)
 	g.Window(window.Session(30 * time.Minute))
@@ -53,49 +55,31 @@ func main() {
 	op.Stop()
 }
 
-type Entry struct {
-	Timestamp string `json:"ts"`
-	User      string `json:"user"`
-	URL       string `json:"url"`
-}
-
 func clean(v interface{}) ([]graph.Event, error) {
-	switch v := v.(type) {
-	case *Entry:
-		ts, err := time.Parse(time.RFC3339, v.Timestamp)
-		if err != nil {
-			return nil, err
-		}
-		return []graph.Event{{
-			TS: ts,
-			Msg: &Event{
-				Timestamp: v.Timestamp,
-				User:      v.User,
-				URL:       v.URL,
-			},
-		}}, nil
-	default:
-		return nil, ErrUnknownType("clean", v)
+	e := v.(*Entry)
+	ts, err := time.Parse(time.RFC3339, e.Timestamp)
+	if err != nil {
+		return nil, err
 	}
+	return []graph.Event{{
+		TS: ts,
+		Msg: &Event{
+			Timestamp: e.Timestamp,
+			User:      e.User,
+			URL:       e.URL,
+		},
+	}}, nil
 }
 
 func user(v interface{}) (string, error) {
-	switch v := v.(type) {
-	case *Event:
-		return v.User, nil
-	default:
-		return "", ErrUnknownType("user", v)
-	}
+	return v.(*Event).User, nil
 }
 
-func printer(span window.Span, vs []interface{}) error {
+func printer(span window.Span, key string, vs []interface{}) error {
 	var buf bytes.Buffer
 	buf.WriteString(fmt.Sprintf("session: %v\n", span))
 	for _, v := range vs {
-		e, ok := v.(*Event)
-		if !ok {
-			return ErrUnknownType("printer", v)
-		}
+		e := v.(*Event)
 		buf.WriteString(fmt.Sprintf("    user: %4v, time: %v, url: %20v\n", e.User, e.Timestamp, e.URL))
 	}
 	fmt.Println(buf.String())

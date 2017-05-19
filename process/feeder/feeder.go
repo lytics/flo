@@ -6,8 +6,8 @@ import (
 	"io"
 	"sync"
 
-	"github.com/lytics/flo/graph"
 	"github.com/lytics/flo/process"
+	"github.com/lytics/flo/source"
 )
 
 var (
@@ -19,12 +19,12 @@ type PutTask func(context.Context, *process.Task)
 type PutError func(string, error)
 
 type Process struct {
-	vs       graph.Collection
+	vs       source.Source
 	putTask  PutTask
 	putError PutError
 }
 
-func New(e PutError, t PutTask, vs graph.Collection) *Process {
+func New(e PutError, t PutTask, vs source.Source) *Process {
 	return &Process{
 		vs:       vs,
 		putTask:  t,
@@ -34,13 +34,18 @@ func New(e PutError, t PutTask, vs graph.Collection) *Process {
 
 func (p *Process) Run(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
-	err := p.vs.Init()
+	meta, err := p.vs.Metadata()
+	if err != nil {
+		p.putError("metadata", err)
+		return
+	}
+	err = p.vs.Init(source.NoID)
 	if err != nil {
 		p.putError("init", err)
 		return
 	}
 	defer func() {
-		err := p.vs.Close()
+		err := p.vs.Stop()
 		if err != nil {
 			p.putError("close", err)
 		}
@@ -59,9 +64,9 @@ func (p *Process) Run(ctx context.Context, wg *sync.WaitGroup) {
 			return
 		}
 		p.putTask(ctx, &process.Task{
-			ID:     id,
+			ID:     string(id),
 			Msg:    msg,
-			Source: p.vs.Name(),
+			Source: meta.Name,
 		})
 	}
 }

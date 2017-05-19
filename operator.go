@@ -22,6 +22,12 @@ import (
 
 var ErrInvalidNamespace = errors.New("invalid namespace")
 
+// Register a value for use, where value must
+// be a protobuf message type.
+func Register(v interface{}) error {
+	return codec.Register(v)
+}
+
 type OperatorCfg struct {
 	Namespace string
 }

@@ -120,6 +120,12 @@ func (w *all) Merge(ts time.Time, vs []interface{}, ss map[Span][]interface{}, f
 	return nil
 }
 
+// Fixed window of width time, same as a sliding
+// window where width and period are euqal.
+func Fixed(width time.Duration) Window {
+	return Sliding(width, width)
+}
+
 // Sliding window, with a width and period. When
 // the period is smaller than the width, multiple
 // windows are produced for each timestamp.
@@ -239,16 +245,4 @@ func (w *session) Merge(ts time.Time, vs []interface{}, ss map[Span][]interface{
 
 	// Call it good.
 	return nil
-}
-
-func expandToElements() {
-	// Darren -> Dar-eng
-
-	// 	Expands per-key, per-window
-	// groups of values into (key, value, event time, window)
-	// tuples, with new per-window timestamps. In this example,
-	// we set the timestamp to the end of the window,
-	// but any timestamp greater than or equal to the timestamp
-	// of the earliest event in the window is valid with
-	// respect to watermark correctness
 }

@@ -1,20 +1,13 @@
 package graph
 
 import (
-	"context"
 	"time"
 
 	"github.com/lytics/flo/merger"
+	"github.com/lytics/flo/source"
 	"github.com/lytics/flo/trigger"
 	"github.com/lytics/flo/window"
 )
-
-type Collection interface {
-	Next(context.Context) (string, interface{}, error)
-	Name() string
-	Init() error
-	Close() error
-}
 
 type Event struct {
 	TS  time.Time
@@ -46,7 +39,7 @@ func New(name string) *Graph {
 
 type Graph struct {
 	name      string
-	from      []Collection
+	from      []source.Source
 	transform func(interface{}) ([]Event, error)
 	groupBy   func(interface{}) (string, error)
 	merger    merger.Merger
@@ -55,7 +48,7 @@ type Graph struct {
 	into      func(window.Span, string, []interface{}) error
 }
 
-func (g *Graph) From(vss ...Collection) {
+func (g *Graph) From(vss ...source.Source) {
 	g.from = vss
 }
 
@@ -95,7 +88,7 @@ type Definition struct {
 	g *Graph
 }
 
-func (def *Definition) From() []Collection {
+func (def *Definition) From() []source.Source {
 	return def.g.from
 }
 

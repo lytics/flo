@@ -5,45 +5,62 @@ import (
 	"context"
 	"os"
 	"strconv"
+
+	"github.com/lytics/flo/source"
 )
 
-func New(filename string) *LineFile {
-	return &LineFile{
-		filename: filename,
+func FromFile(name string) *Source {
+	return &Source{
+		name: name,
 	}
 }
 
-type LineFile struct {
-	f        *os.File
-	r        *bufio.Reader
-	pos      int
-	filename string
+type Source struct {
+	f    *os.File
+	r    *bufio.Reader
+	pos  int
+	name string
 }
 
-func (lf *LineFile) Next(context.Context) (string, interface{}, error) {
-	l, err := lf.r.ReadString('\n')
+func (f *Source) Metadata() (*source.Metadata, error) {
+	return &source.Metadata{
+		Name:       f.name,
+		Addressing: source.Sequential,
+	}, nil
+}
+
+func (s *Source) Next(context.Context) (source.ID, interface{}, error) {
+	l, err := s.r.ReadString('\n')
 	if err != nil {
 		return "", nil, err
 	}
-	pos := lf.pos
-	lf.pos++
-	return strconv.Itoa(pos), l, nil
+	pos := s.pos
+	s.pos++
+	id := source.ID(strconv.Itoa(pos))
+	return id, l, nil
 }
 
-func (lf *LineFile) Name() string {
-	return lf.filename
-}
-
-func (lf *LineFile) Init() error {
-	f, err := os.Open(lf.filename)
+func (s *Source) Init(pos source.ID) error {
+	f, err := os.Open(s.name)
 	if err != nil {
 		return err
 	}
-	lf.f = f
-	lf.r = bufio.NewReader(f)
+	s.f = f
+	s.r = bufio.NewReader(s.f)
+	if pos != "" {
+		posNum, err := strconv.Atoi(string(pos))
+		if err != nil {
+			return err
+		}
+		for i := 0; i < posNum; i++ {
+			if _, _, err := s.Next(nil); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
-func (lf *LineFile) Close() error {
-	return lf.f.Close()
+func (s *Source) Stop() error {
+	return s.f.Close()
 }

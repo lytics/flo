@@ -7,24 +7,71 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"time"
+
+	"github.com/lytics/flo/source"
+	"github.com/lytics/flo/source/metadatascanner"
 )
 
-// Objects from JSON encoded values.
-type Objects struct {
+// FromFile reads JSON objects from the file. Parameter
+// prototype should be a non-pointer value of the type
+// to decode into, for example:
+//
+//     data, err := jsonfile.FromFile(MyType{}, "event.data")
+//
+func FromFile(prototype interface{}, name string) *Source {
+	return &Source{
+		name:      name,
+		prototype: prototype,
+	}
+}
+
+func FromFiles(prototype interface{}, glob string) []*Source {
+	return nil
+}
+
+// Source from JSON encoded values.
+type Source struct {
 	pos       int
 	f         *os.File
 	stream    *json.Decoder
-	filename  string
+	name      string
 	prototype interface{}
+	h         *source.Metadata
+	inspect   func(interface{}) (time.Time, error)
 }
 
-// Name of the source.
-func (s *Objects) Name() string {
-	return s.filename
+// WithMeta will cause the file to be read fully to discover
+// timestamp and size metadata of the file contents.
+func (s *Source) WithMeta(f func(interface{}) (time.Time, error)) *Source {
+	s.inspect = f
+	return s
 }
 
-// Next value or io.EOF.
-func (s *Objects) Next(context.Context) (string, interface{}, error) {
+// Metadata about source.
+func (s *Source) Metadata() (*source.Metadata, error) {
+	var meta *source.Metadata
+	var err error
+	if s.inspect != nil {
+		err = s.Init("")
+		if err != nil {
+			return nil, err
+		}
+		defer s.Stop()
+		meta, err = metadatascanner.Scan(s, s.inspect)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		meta = &source.Metadata{}
+	}
+	meta.Name = s.name
+	meta.Addressing = source.Sequential
+	return meta, nil
+}
+
+// Next value of the source.
+func (s *Source) Next(context.Context) (source.ID, interface{}, error) {
 	for {
 		v := reflect.New(reflect.TypeOf(s.prototype)).Interface()
 		if err := s.stream.Decode(v); err != nil {
@@ -32,35 +79,32 @@ func (s *Objects) Next(context.Context) (string, interface{}, error) {
 		}
 		pos := s.pos
 		s.pos++
-		return strconv.Itoa(pos), v, nil
+		id := source.ID(strconv.Itoa(pos))
+		return id, v, nil
 	}
 }
 
-// Init the collection.
-func (s *Objects) Init() error {
-	f, err := os.Open(s.filename)
+// Init the source.
+func (s *Source) Init(pos source.ID) error {
+	f, err := os.Open(s.name)
 	if err != nil {
 		return err
 	}
 	s.f = f
-	s.stream = json.NewDecoder(bufio.NewReader(f))
+	s.stream = json.NewDecoder(bufio.NewReader(s.f))
+	if pos != "" {
+		posNum, err := strconv.Atoi(string(pos))
+		if err != nil {
+			return err
+		}
+		for i := 0; i < posNum; i++ {
+			s.Next(context.Background())
+		}
+	}
 	return nil
 }
 
-// Close the collection.
-func (s *Objects) Close() error {
+// Stop the source.
+func (s *Source) Stop() error {
 	return s.f.Close()
-}
-
-// FromObjects reads JSON objects from the file. Parameter
-// prototype should be a non-pointer value of the type
-// to decode into, for example:
-//
-//     objs, err := jsonfile.FromObjects(MyType{}, "event.data")
-//
-func FromObjects(prototype interface{}, filename string) *Objects {
-	return &Objects{
-		filename:  filename,
-		prototype: prototype,
-	}
 }
