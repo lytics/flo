@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/lytics/flo/progress"
 	"github.com/lytics/flo/window"
 )
 
@@ -24,6 +25,8 @@ type Count struct {
 	modified map[string]int
 }
 
+func (t *Count) Heuristic(*progress.Heuristic) {}
+
 func (t *Count) Modified(key string, v interface{}, vs map[window.Span][]interface{}) error {
 	current := t.modified[key]
 	if current >= t.count {
@@ -35,8 +38,9 @@ func (t *Count) Modified(key string, v interface{}, vs map[window.Span][]interfa
 	return nil
 }
 
-func (t *Count) Start(signal func(keys []string)) {
+func (t *Count) Start(signal func(keys []string)) error {
 	t.signal = signal
+	return nil
 }
 
 func (t *Count) Stop() {}

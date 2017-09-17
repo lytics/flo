@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package msg;
+
+message Keyed {
+	string Key = 1;
+	bytes Data = 2;
+	string DataType = 3;
+	int64 TS = 4;
+	string Graph = 6;
+}
+
+message Progress {
+	string Peer = 1;
+	string Graph = 2;
+	repeated string Source = 3;
+	bool Done = 4;
+	int64 MinEventTime = 5;
+}

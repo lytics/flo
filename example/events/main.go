@@ -59,12 +59,13 @@ func clean(v interface{}) ([]graph.Event, error) {
 	if err != nil {
 		return nil, err
 	}
+	msg := &Event{
+		Timestamp: e.Timestamp,
+		Data:      e.Data,
+	}
 	return []graph.Event{{
-		TS: ts,
-		Msg: &Event{
-			Timestamp: e.Timestamp,
-			Data:      e.Data,
-		},
+		Msg:  msg,
+		Time: ts,
 	}}, nil
 }
 

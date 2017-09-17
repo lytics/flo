@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/lytics/flo/progress"
 	"github.com/lytics/flo/window"
 )
 
@@ -28,6 +29,8 @@ type Period struct {
 	modified map[string]bool
 }
 
+func (t *Period) Heuristic(*progress.Heuristic) {}
+
 func (t *Period) Modified(key string, v interface{}, vs map[window.Span][]interface{}) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -36,7 +39,7 @@ func (t *Period) Modified(key string, v interface{}, vs map[window.Span][]interf
 	return nil
 }
 
-func (t *Period) Start(signal func(keys []string)) {
+func (t *Period) Start(signal func(keys []string)) error {
 	t.ticker = time.NewTicker(t.period)
 
 	snapshot := func() []string {
@@ -52,11 +55,10 @@ func (t *Period) Start(signal func(keys []string)) {
 		return keys
 	}
 
-	go func() {
-		for range t.ticker.C {
-			signal(snapshot())
-		}
-	}()
+	for range t.ticker.C {
+		signal(snapshot())
+	}
+	return nil
 }
 
 func (t *Period) Stop() {

@@ -23,19 +23,19 @@ type Slowdown struct {
 }
 
 // Next item in the source.
-func (s *Slowdown) Next(ctx context.Context) (source.ID, interface{}, error) {
+func (s *Slowdown) Next(ctx context.Context, put source.Put) error {
 	s.limiter.Wait(ctx)
-	return s.vs.Next(ctx)
+	return s.vs.Next(ctx, put)
 }
 
 // Metadata of the source.
-func (s *Slowdown) Metadata() (*source.Metadata, error) {
+func (s *Slowdown) Metadata() source.Metadata {
 	return s.vs.Metadata()
 }
 
 // Init the source.
-func (s *Slowdown) Init(id source.ID) error {
-	return s.vs.Init(id)
+func (s *Slowdown) Init() error {
+	return s.vs.Init()
 }
 
 // Stop the source.

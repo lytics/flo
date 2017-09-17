@@ -59,13 +59,14 @@ func clean(v interface{}) ([]graph.Event, error) {
 		if w == "" {
 			continue
 		}
+		msg := &Word{
+			Text:  w,
+			Count: 1,
+		}
 		ws = append(ws, graph.Event{
-			TS: time.Now(),
-			ID: md5id.FromString(w),
-			Msg: &Word{
-				Text:  w,
-				Count: 1,
-			},
+			ID:   md5id.FromString(w),
+			Msg:  msg,
+			Time: time.Now(),
 		})
 	}
 	return ws, nil

@@ -8,49 +8,53 @@ import (
 	"github.com/lytics/flo/source"
 )
 
-// FromStrings creates a finite collection of strings.
-func FromStrings(name string, ss []string) *Source {
-	return &Source{name: name, data: ss}
+// FromSlice creates a finite collection of data.
+func FromSlice(name string, data []interface{}) *Source {
+	return &Source{
+		meta: source.Metadata{
+			Name:       name,
+			Addressing: source.Sequential,
+		},
+		data: data,
+	}
 }
 
+// Source of data.
 type Source struct {
 	pos  int
-	data []string
-	name string
+	data []interface{}
+	meta source.Metadata
 }
 
-func (s *Source) Metadata() (*source.Metadata, error) {
-	return &source.Metadata{
-		Name:       s.name,
-		Addressing: source.Sequential,
-	}, nil
+// Metadata about the source.
+func (s *Source) Metadata() source.Metadata {
+	return s.meta
 }
 
-func (s *Source) Next(context.Context) (string, interface{}, error) {
-	if s.pos >= len(s.data) {
-		return "", nil, io.EOF
-	}
-
-	w := s.data[s.pos]
-	pos := s.pos
-	s.pos++
-
-	return strconv.Itoa(pos), w, nil
-}
-
-func (s *Source) Init(pos string) error {
-	if pos != "" {
-		posNum, err := strconv.Atoi(pos)
-		if err != nil {
-			return err
-		}
-		for i := 0; i < posNum; i++ {
-			s.Next(context.Background())
-		}
-	}
+// Init the source.
+func (s *Source) Init() error {
 	return nil
 }
 
+// Stop the source.
 func (s *Source) Stop() error {
 	return nil
+}
+
+// Take next item from source.
+func (s *Source) Take(ctx context.Context) (source.ID, interface{}, error) {
+	select {
+	case <-ctx.Done():
+		return source.NoID, nil, context.DeadlineExceeded
+	default:
+	}
+
+	if s.pos >= len(s.data) {
+		return source.NoID, nil, io.EOF
+	}
+	v := s.data[s.pos]
+	id := source.ID(strconv.Itoa(s.pos))
+	s.pos++
+
+	return id, v, nil
 }

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/lytics/flo/progress"
 	"github.com/lytics/flo/window"
 )
 
@@ -28,6 +29,8 @@ type Dormant struct {
 	modified map[string]time.Time
 }
 
+func (t *Dormant) Heuristic(*progress.Heuristic) {}
+
 // Modified key, v is the incoming data, vs is v merged into previous values.
 func (t *Dormant) Modified(key string, v interface{}, vs map[window.Span][]interface{}) error {
 	t.mu.Lock()
@@ -37,7 +40,7 @@ func (t *Dormant) Modified(key string, v interface{}, vs map[window.Span][]inter
 	return nil
 }
 
-// Start the trigger, signalling chanegd keys with the signal function.
+// Start the trigger, signalling changed keys with the signal function.
 func (t *Dormant) Start(signal func(keys []string)) {
 	freq := t.after / 100
 	if freq < 1*time.Second {

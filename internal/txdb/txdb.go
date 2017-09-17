@@ -27,23 +27,65 @@ func (r *Row) Snapshot() *Row {
 	return s
 }
 
-// New database.
 func New(name string) *DB {
 	return &DB{
-		values: map[string]*Row{},
+		buckets: map[string]*Bucket{},
 	}
 }
 
-// DB of key values organized into individual
-// windows of time.
 type DB struct {
-	mu     sync.Mutex
-	name   string
-	values map[string]*Row
+	mu      sync.Mutex
+	buckets map[string]*Bucket
+}
+
+func (db *DB) Bucket(name string) *Bucket {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	b, ok := db.buckets[name]
+	if !ok {
+		b = NewBucket(name)
+		db.buckets[name] = b
+	}
+	return b
+}
+
+// NewBucket in the database.
+func NewBucket(name string) *Bucket {
+	return &Bucket{
+		values:   map[string]*Row{},
+		finished: map[string]bool{},
+	}
+}
+
+// Bucket of key values organized into individual
+// windows of time.
+type Bucket struct {
+	mu       sync.Mutex
+	name     string
+	values   map[string]*Row
+	finished map[string]bool
+}
+
+// Finish with the named source.
+func (m *Bucket) Finish(name string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.finished[name] = true
+}
+
+// Finished sources.
+func (m *Bucket) Finished() map[string]bool {
+	snap := map[string]bool{}
+	for k := range m.finished {
+		snap[k] = true
+	}
+	return snap
 }
 
 // Drain the keys into the sink.
-func (m *DB) Drain(keys []string, sink func(span window.Span, key string, vs []interface{}) error) {
+func (m *Bucket) Drain(keys []string, sink func(span window.Span, key string, vs []interface{}) error) {
 	for key, row := range m.snapshot(keys) {
 		for span, vs := range row.Windows {
 			sink(span, key, vs)
@@ -52,7 +94,7 @@ func (m *DB) Drain(keys []string, sink func(span window.Span, key string, vs []i
 }
 
 // Apply the mutation to the graph key's row.
-func (m *DB) Apply(key string, mutation func(*Row) error) error {
+func (m *Bucket) Apply(key string, mutation func(*Row) error) error {
 	row := m.fetchRowForMutation(key)
 
 	row.mu.Lock()
@@ -61,7 +103,7 @@ func (m *DB) Apply(key string, mutation func(*Row) error) error {
 	return mutation(row)
 }
 
-func (m *DB) fetchRowForMutation(key string) *Row {
+func (m *Bucket) fetchRowForMutation(key string) *Row {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -74,7 +116,7 @@ func (m *DB) fetchRowForMutation(key string) *Row {
 	return row
 }
 
-func (m *DB) snapshot(keys []string) map[string]*Row {
+func (m *Bucket) snapshot(keys []string) map[string]*Row {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

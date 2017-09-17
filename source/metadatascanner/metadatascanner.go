@@ -22,7 +22,37 @@ func Scan(vs source.Source, inspect func(interface{}) (time.Time, error)) (*sour
 	n2o := true
 	for {
 		timeout, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		_, v, err := vs.Next(timeout)
+		err := vs.Next(timeout, func(ctx context.Context, id source.ID, v interface{}) error {
+			ts, err := inspect(v)
+			if err != nil {
+				return err
+			}
+			cnt++
+
+			if min.IsZero() {
+				min = ts
+			}
+			if max.IsZero() {
+				max = ts
+			}
+			if min.After(ts) {
+				min = ts
+			}
+			if max.Before(ts) {
+				max = ts
+			}
+
+			if cnt > 1 {
+				if prv.After(ts) {
+					o2n = false
+				}
+				if prv.Before(ts) {
+					n2o = false
+				}
+			}
+			prv = ts
+			return nil
+		})
 		cancel()
 		if err == io.EOF {
 			break
@@ -30,35 +60,8 @@ func Scan(vs source.Source, inspect func(interface{}) (time.Time, error)) (*sour
 		if err != nil {
 			return nil, err
 		}
-		cnt++
-
-		ts, err := inspect(v)
-		if err != nil {
-			return nil, err
-		}
-		if min.IsZero() {
-			min = ts
-		}
-		if max.IsZero() {
-			max = ts
-		}
-		if min.After(ts) {
-			min = ts
-		}
-		if max.Before(ts) {
-			max = ts
-		}
-
-		if cnt > 1 {
-			if prv.After(ts) {
-				o2n = false
-			}
-			if prv.Before(ts) {
-				n2o = false
-			}
-		}
-		prv = ts
 	}
+
 	var order source.TimeOrder
 	if o2n {
 		order = source.Ascending

@@ -5,6 +5,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/lytics/flo/progress"
 	"github.com/lytics/flo/window"
 )
 
@@ -22,7 +23,7 @@ type Finished struct {
 	modified map[string]bool
 }
 
-func (t *Finished) Heuristic(h *Heuristic) {
+func (t *Finished) Heuristic(h *progress.Heuristic) {
 	if !h.EOS {
 		return
 	}

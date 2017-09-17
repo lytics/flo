@@ -9,58 +9,59 @@ import (
 	"github.com/lytics/flo/source"
 )
 
+// FromFile create a source.
 func FromFile(name string) *Source {
 	return &Source{
-		name: name,
+		meta: source.Metadata{
+			Name:       name,
+			Addressing: source.Sequential,
+		},
 	}
 }
 
+// Source of data.
 type Source struct {
 	f    *os.File
 	r    *bufio.Reader
 	pos  int
-	name string
+	meta source.Metadata
 }
 
-func (f *Source) Metadata() (*source.Metadata, error) {
-	return &source.Metadata{
-		Name:       f.name,
-		Addressing: source.Sequential,
-	}, nil
+// Metadata about the source.
+func (s *Source) Metadata() source.Metadata {
+	return s.meta
 }
 
-func (s *Source) Next(context.Context) (source.ID, interface{}, error) {
-	l, err := s.r.ReadString('\n')
-	if err != nil {
-		return "", nil, err
-	}
-	pos := s.pos
-	s.pos++
-	id := source.ID(strconv.Itoa(pos))
-	return id, l, nil
-}
-
-func (s *Source) Init(pos source.ID) error {
-	f, err := os.Open(s.name)
+// Init the source.
+func (s *Source) Init() error {
+	f, err := os.Open(s.meta.Name)
 	if err != nil {
 		return err
 	}
 	s.f = f
 	s.r = bufio.NewReader(s.f)
-	if pos != "" {
-		posNum, err := strconv.Atoi(string(pos))
-		if err != nil {
-			return err
-		}
-		for i := 0; i < posNum; i++ {
-			if _, _, err := s.Next(nil); err != nil {
-				return err
-			}
-		}
-	}
 	return nil
 }
 
+// Stop the source.
 func (s *Source) Stop() error {
 	return s.f.Close()
+}
+
+// Take next value from source.
+func (s *Source) Take(ctx context.Context) (source.ID, interface{}, error) {
+	select {
+	case <-ctx.Done():
+		return source.NoID, nil, context.DeadlineExceeded
+	default:
+	}
+
+	v, err := s.r.ReadString('\n')
+	if err != nil {
+		return source.NoID, nil, err
+	}
+	id := source.ID(strconv.Itoa(s.pos))
+	s.pos++
+
+	return id, v, nil
 }

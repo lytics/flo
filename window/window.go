@@ -64,12 +64,15 @@ func (s Span) Overlap(r Span) bool {
 	//     s = [10:13, 10:23)
 	//     r = [10:13, 10:23)
 	//
-	// FASE OTHERWISE:
+	// FASE IF:
 	//     s = [10:13, 10:23)
 	//     r =        [10:23, 10:33)
 	// OR
 	//     s =        [10:23, 10:33)
 	//     r = [10:13, 10:23)
+	// OR
+	//     s =                 [10:30, 10:33)
+	//     r = [10:13, 10:20)
 	if s.Start().Equal(r.Start()) {
 		return true
 	}

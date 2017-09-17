@@ -175,22 +175,27 @@ func (s *Source) Metadata() (*source.Metadata, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.Init("")
+	s.Init()
 	meta.Name = s.name
 	meta.Addressing = source.Sequential
 	return meta, nil
 }
 
-func (s *Source) Next(context.Context) (source.ID, interface{}, error) {
-	if len(s.events) == s.pos {
-		return "", nil, io.EOF
+func (s *Source) Next(ctx context.Context, put source.Put) error {
+	if s.pos >= len(s.events) {
+		return io.EOF
 	}
 	e := s.events[s.pos]
+	id := source.ID(e.ID)
+	err := put(ctx, id, e)
+	if err != nil {
+		return err
+	}
 	s.pos++
-	return source.ID(e.ID), e, nil
+	return nil
 }
 
-func (s *Source) Init(pos source.ID) error {
+func (s *Source) Init() error {
 	s.pos = 0
 	return nil
 }

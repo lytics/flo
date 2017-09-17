@@ -7,10 +7,8 @@ import (
 	"os"
 	"reflect"
 	"strconv"
-	"time"
 
 	"github.com/lytics/flo/source"
-	"github.com/lytics/flo/source/metadatascanner"
 )
 
 // FromFile reads JSON objects from the file. Parameter
@@ -21,13 +19,12 @@ import (
 //
 func FromFile(prototype interface{}, name string) *Source {
 	return &Source{
-		name:      name,
+		meta: source.Metadata{
+			Name:       name,
+			Addressing: source.Sequential,
+		},
 		prototype: prototype,
 	}
-}
-
-func FromFiles(prototype interface{}, glob string) []*Source {
-	return nil
 }
 
 // Source from JSON encoded values.
@@ -35,76 +32,45 @@ type Source struct {
 	pos       int
 	f         *os.File
 	stream    *json.Decoder
-	name      string
+	meta      source.Metadata
 	prototype interface{}
-	h         *source.Metadata
-	inspect   func(interface{}) (time.Time, error)
-}
-
-// WithMeta will cause the file to be read fully to discover
-// timestamp and size metadata of the file contents.
-func (s *Source) WithMeta(f func(interface{}) (time.Time, error)) *Source {
-	s.inspect = f
-	return s
 }
 
 // Metadata about source.
-func (s *Source) Metadata() (*source.Metadata, error) {
-	var meta *source.Metadata
-	var err error
-	if s.inspect != nil {
-		err = s.Init("")
-		if err != nil {
-			return nil, err
-		}
-		defer s.Stop()
-		meta, err = metadatascanner.Scan(s, s.inspect)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		meta = &source.Metadata{}
-	}
-	meta.Name = s.name
-	meta.Addressing = source.Sequential
-	return meta, nil
-}
-
-// Next value of the source.
-func (s *Source) Next(context.Context) (source.ID, interface{}, error) {
-	for {
-		v := reflect.New(reflect.TypeOf(s.prototype)).Interface()
-		if err := s.stream.Decode(v); err != nil {
-			return "", nil, err
-		}
-		pos := s.pos
-		s.pos++
-		id := source.ID(strconv.Itoa(pos))
-		return id, v, nil
-	}
+func (s *Source) Metadata() source.Metadata {
+	return s.meta
 }
 
 // Init the source.
-func (s *Source) Init(pos source.ID) error {
-	f, err := os.Open(s.name)
+func (s *Source) Init() error {
+	f, err := os.Open(s.meta.Name)
 	if err != nil {
 		return err
 	}
 	s.f = f
 	s.stream = json.NewDecoder(bufio.NewReader(s.f))
-	if pos != "" {
-		posNum, err := strconv.Atoi(string(pos))
-		if err != nil {
-			return err
-		}
-		for i := 0; i < posNum; i++ {
-			s.Next(context.Background())
-		}
-	}
 	return nil
 }
 
 // Stop the source.
 func (s *Source) Stop() error {
 	return s.f.Close()
+}
+
+// Take next value of the source.
+func (s *Source) Take(ctx context.Context) (source.ID, interface{}, error) {
+	select {
+	case <-ctx.Done():
+		return source.NoID, nil, context.DeadlineExceeded
+	default:
+	}
+
+	v := reflect.New(reflect.TypeOf(s.prototype)).Interface()
+	if err := s.stream.Decode(v); err != nil {
+		return source.NoID, nil, err
+	}
+	id := source.ID(strconv.Itoa(s.pos))
+	s.pos++
+
+	return id, v, nil
 }
