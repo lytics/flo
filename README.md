@@ -34,11 +34,10 @@ for processing, which must be Protobuf messages. And registering
 the graphs used for processing.
 
 	flo.RegisterMsg(<message>)
-	flo.RegisterGraph(<grapType>, <graph>)
+	flo.RegisterGraph(<grapType>, g)
 
-Since flo is just a library, processing is done the Go way: by
-building a static binary which just uses the flo server to
-start and stop graphs.
+Since flo is just a library, processing is done the Go way, by
+building a static binary which just uses the flo server.
 
 	server, ... := flo.NewServer(...)
 	lis, ... := net.Listen(...)
