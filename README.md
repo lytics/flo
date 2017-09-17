@@ -5,10 +5,10 @@ A dataflow like library for Go.
 
 ### Introduction
 
-Graphs are pipelines, you can think of them as a template
-or class, a graph can be started multiple times with
-a different name and configuration. Below each ...
-represents a function that the user of flo supplies.
+Graphs are processing pipelines, you can think of them
+as a template or class, a graph can be started multiple
+times with a different name and configuration. Below each
+... represents a function that the user of flo supplies.
 
 	g := graph.New()
 	g.From(...)
