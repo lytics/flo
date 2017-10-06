@@ -2,10 +2,12 @@ package leader
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
-	"sync"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/lytics/flo/graph"
 	"github.com/lytics/flo/internal/peerqueue"
@@ -28,16 +30,9 @@ type Listen func(name string) (<-chan grid.Request, func() error, error)
 
 // New peer watcher.
 func New(db *txdb.DB, d Define, s Send, l Listen, w Watch, p Peers, m Mailboxes) (*Actor, error) {
-	tracker := peerqueue.New()
-	for i := 0; i < 10; i++ {
-		def := grid.NewActorStart("worker-%d", i)
-		def.Type = "worker"
-		tracker.SetRequired(def)
-	}
-
 	return &Actor{
 		logger:    log.New(os.Stderr, "leader: ", log.LstdFlags),
-		tracker:   tracker,
+		tracker:   peerqueue.New(),
 		db:        db,
 		define:    d,
 		send:      s,
@@ -49,8 +44,8 @@ func New(db *txdb.DB, d Define, s Send, l Listen, w Watch, p Peers, m Mailboxes)
 }
 
 type Actor struct {
+	eg      *errgroup.Group
 	ctx     context.Context
-	cancel  func()
 	logger  *log.Logger
 	tracker *peerqueue.PeerQueue
 	// Outside world
@@ -65,24 +60,16 @@ type Actor struct {
 
 // Act as leader.
 func (a *Actor) Act(ctx context.Context) {
-	a.logger.Printf("leader is running")
-	// Create another context that will control
-	// the exit of the helper go-routines. They
-	// need to continue to run after an exit
-	// has been request, for the sake of an
-	// ordered "shutdown".
-	a.ctx, a.cancel = context.WithCancel(context.Background())
+	a.logger.Printf("running")
 
-	wg := &sync.WaitGroup{}
-	wg.Add(2)
+	a.eg, a.ctx = errgroup.WithContext(ctx)
+	a.eg.Go(a.runPeerWatcher)
+	a.eg.Go(a.runMailboxWatcher)
+	err := a.eg.Wait()
+	if err != nil {
+		a.logger.Printf("failed with: %v", err)
+	}
 
-	go a.runPeerWatcher(wg)
-	go a.runMailboxWatcher(wg)
-
-	<-ctx.Done()
-	a.cancel()
-
-	wg.Wait()
 	a.logger.Printf("shutdown")
 }
 
@@ -91,42 +78,39 @@ func (a *Actor) String() string {
 	return "leader"
 }
 
-func (a *Actor) runPeerWatcher(wg *sync.WaitGroup) {
-	defer wg.Done()
-
+func (a *Actor) runPeerWatcher() error {
 	current, peers, err := a.peers(a.ctx)
 	if err != nil {
-		a.logger.Printf("failed creating peer watch: %v", err)
-		a.cancel()
+		return err
 	}
+
 	for _, c := range current {
 		a.tracker.Live(c.Peer())
+		a.tracker.SetRequired(workerDef(c.Peer()))
 	}
 
 	for {
 		select {
 		case <-a.ctx.Done():
-			return
+			return nil
 		case e := <-peers:
 			switch e.Type {
 			case grid.WatchError:
-				a.cancel()
+				return e.Err()
 			case grid.EntityLost:
 				a.tracker.Dead(e.Peer())
 			case grid.EntityFound:
 				a.tracker.Live(e.Peer())
+				a.tracker.SetRequired(workerDef(e.Peer()))
 			}
 		}
 	}
 }
 
-func (a *Actor) runMailboxWatcher(wg *sync.WaitGroup) {
-	defer wg.Done()
-
+func (a *Actor) runMailboxWatcher() error {
 	current, mailboxes, err := a.mailboxes(a.ctx)
 	if err != nil {
-		a.logger.Printf("failed creating mailbox watch: %v", err)
-		a.cancel()
+		return err
 	}
 	for _, c := range current {
 		a.tracker.Register(c.Name(), c.Peer())
@@ -141,7 +125,7 @@ func (a *Actor) runMailboxWatcher(wg *sync.WaitGroup) {
 	for {
 		select {
 		case <-a.ctx.Done():
-			return
+			return nil
 		case <-missingTimer.C:
 			cnt := 0
 			for _, def := range a.tracker.Missing() {
@@ -168,8 +152,7 @@ func (a *Actor) runMailboxWatcher(wg *sync.WaitGroup) {
 			a.logger.Printf("%v", e)
 			switch e.Type {
 			case grid.WatchError:
-				a.logger.Printf("fatal error: %v", e.Err())
-				a.cancel()
+				return err
 			case grid.EntityLost:
 				a.tracker.Unregister(e.Name())
 			case grid.EntityFound:
@@ -180,7 +163,7 @@ func (a *Actor) runMailboxWatcher(wg *sync.WaitGroup) {
 }
 
 func (a *Actor) startActor(def *grid.ActorStart) error {
-	peer, err := a.tracker.MinAssigned()
+	peer, err := peerFromDef(def)
 	if err != nil {
 		return err
 	}
@@ -191,4 +174,21 @@ func (a *Actor) startActor(def *grid.ActorStart) error {
 		return err
 	}
 	return nil
+}
+
+func workerDef(peer string) *grid.ActorStart {
+	def := grid.NewActorStart("worker-%v", peer)
+	def.Type = "worker"
+	def.Data = []byte(peer)
+	return def
+}
+
+func peerFromDef(def *grid.ActorStart) (string, error) {
+	if def.Type != "worker" {
+		return "", fmt.Errorf("unkown worker type: %v", def.Type)
+	}
+	if string(def.Data) == "" {
+		return "", fmt.Errorf("empty peer name in worker actor def")
+	}
+	return string(def.Data), nil
 }

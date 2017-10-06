@@ -12,7 +12,7 @@ import (
 	"github.com/lytics/flo"
 	"github.com/lytics/flo/graph"
 	"github.com/lytics/flo/sink"
-	"github.com/lytics/flo/sink/printer"
+	"github.com/lytics/flo/sink/funcsink"
 	"github.com/lytics/flo/source"
 	"github.com/lytics/flo/source/jsonfile"
 	"github.com/lytics/flo/trigger"
@@ -22,15 +22,18 @@ import (
 // WithoutConf is a nil configuration for graphs.
 var WithoutConf = []byte(nil)
 
+// main process acts as both server and client for flo graphs;
+// it starts a server, and then uses the client to launch a
+// processing graph in itself.
 func main() {
 	// Build graph definition.
 	g := graph.New()
-	g.From(source.WrapSources(jsonfile.FromFile(Event{}, "event.data")))
+	g.From(source.SkipSetup(jsonfile.New(Event{}, "event.data")))
 	g.Transform(clean)
 	g.Group(user)
 	g.Window(window.Session(30 * time.Minute))
 	g.Trigger(trigger.AtPeriod(10 * time.Second))
-	g.Into(sink.WrapSinks(printer.FromFunc(print)))
+	g.Into(sink.SkipSetup(funcsink.New(print)))
 
 	// Register our message type, and graph type.
 	flo.RegisterMsg(Event{})
@@ -40,7 +43,8 @@ func main() {
 	etcd, err := clientv3.New(clientv3.Config{Endpoints: []string{"localhost:2379"}})
 	successOrDie(err)
 
-	// Create the flo config.
+	// Create the flo config, the only required
+	// field is the namespace.
 	cfg := flo.Cfg{Namespace: "example"}
 
 	// Create the flo client.
@@ -77,6 +81,8 @@ func main() {
 	// Terminate the default instance of the sessions graph.
 	err = client.TerminateGraph("sessions", "default")
 	successOrDie(err)
+
+	fmt.Println("stopped, bye bye")
 }
 
 func clean(v interface{}) ([]graph.Event, error) {
@@ -85,13 +91,14 @@ func clean(v interface{}) ([]graph.Event, error) {
 	if err != nil {
 		return nil, err
 	}
+	e1 := &Event{
+		Timestamp: e.Timestamp,
+		User:      e.User,
+		URL:       e.URL,
+	}
 	return []graph.Event{{
 		Time: ts,
-		Msg: &Event{
-			Timestamp: e.Timestamp,
-			User:      e.User,
-			URL:       e.URL,
-		},
+		Msg:  e1,
 	}}, nil
 }
 

@@ -1,8 +1,8 @@
-package printer
+package funcsink
 
 import "github.com/lytics/flo/window"
 
-func FromFunc(f func(w window.Span, key string, vs []interface{}) error) *Sink {
+func New(f func(w window.Span, key string, vs []interface{}) error) *Sink {
 	return &Sink{
 		f: f,
 	}

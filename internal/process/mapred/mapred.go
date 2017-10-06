@@ -22,7 +22,7 @@ type Send func(timeout time.Duration, receiver string, msg interface{}) (interfa
 
 type Listen func(name string) (<-chan grid.Request, func() error, error)
 
-// New mapper.
+// New map and reduce process.
 func New(id, graphType, graphName string, conf []byte, def *graph.Definition, db *txdb.Bucket, s Send, l Listen) *Process {
 	return &Process{
 		id:        id,
@@ -37,7 +37,7 @@ func New(id, graphType, graphName string, conf []byte, def *graph.Definition, db
 	}
 }
 
-// Process for mapping source data.
+// Process for mapping and reducing.
 type Process struct {
 	id        string
 	graphType string
@@ -60,6 +60,10 @@ type Process struct {
 func (p *Process) Run() error {
 	p.logger.Printf("starting")
 
+	// TODO
+	// This is a global assumption, if the leader
+	// ever starts more or less of these then this
+	// is broken.
 	for i := 0; i < 10; i++ {
 		p.receivers = append(p.receivers, fmt.Sprintf("worker-%d-%v-%v", i, p.graphType, p.graphName))
 	}

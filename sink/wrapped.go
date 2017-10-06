@@ -1,18 +1,18 @@
 package sink
 
-// WrapSinks from a collection of sinks.
-func WrapSinks(ss ...Sink) *WrappedSinks {
-	return &WrappedSinks{
+// SkipSetup for a collection of sinks.
+func SkipSetup(ss ...Sink) *SkipSetupSinks {
+	return &SkipSetupSinks{
 		ss: ss,
 	}
 }
 
-// WrappedSinks that implement a no-op setup.
-type WrappedSinks struct {
+// SkipSetupSinks implements a no-op setup.
+type SkipSetupSinks struct {
 	ss []Sink
 }
 
-// Setup the sinks.
-func (ws *WrappedSinks) Setup(graphType, graphName string, conf []byte) ([]Sink, error) {
+// Setup the sinks, but really do nothing.
+func (ws *SkipSetupSinks) Setup(graphType, graphName string, conf []byte) ([]Sink, error) {
 	return ws.ss, nil
 }

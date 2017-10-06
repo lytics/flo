@@ -70,41 +70,80 @@ func (a *Actor) Act(ctx context.Context) {
 	}
 
 	for _, e := range current {
-		a.runGraph(e)
+		a.evalEvent(e)
 	}
 
 	for {
 		select {
 		case e := <-events:
-			a.runGraph(e)
+			a.evalEvent(e)
 		}
 	}
 }
 
-func (a *Actor) runGraph(e *registry.WatchEvent) {
-	def, ok := a.define(e.Reg.Type)
-	if ok {
-		key := e.Reg.Type + ":" + e.Reg.Name
-		_, ok := a.running[key]
-		if !ok && e.Reg.Wanted == "running" {
-			conf, err := e.Reg.UnmarshalConfig()
-			if err != nil {
-				a.logger.Printf("failed starting: %v.%v, failed to unmarshal config: %v", e.Reg.Type, e.Reg.Name, err)
-			}
-			bucket := a.db.Bucket(key)
-			p := mapred.New(
-				a.name,
-				e.Reg.Type,
-				e.Reg.Name,
-				conf,
-				def,
-				bucket,
-				mapred.Send(a.send),
-				mapred.Listen(a.listen),
-			)
-			a.running[key] = p
-			a.logger.Printf("starting graph: %v.%v", e.Reg.Type, e.Reg.Name)
-			p.Run()
+func (a *Actor) evalEvent(e *registry.WatchEvent) {
+	a.logger.Printf("got event: %v", e)
+
+	if e == nil || e.Reg == nil {
+		return
+	}
+
+	key := e.Reg.Type + "." + e.Reg.Name
+	graphType := e.Reg.Type
+	graphName := e.Reg.Name
+
+	switch e.Reg.Wanted {
+	case "running":
+		conf, err := e.Reg.UnmarshalConfig()
+		if err != nil {
+			a.logger.Printf("for graph: %v, failed unmarshaling config: %v", key, err)
+			return
 		}
+		a.runGraph(key, graphType, graphName, conf)
+	case "stopping":
+		a.stopGraph(key)
+	case "terminating":
+		a.terminateGraph(key)
+	}
+}
+
+func (a *Actor) runGraph(key, graphType, graphName string, conf []byte) {
+	def, ok := a.define(graphType)
+	if !ok {
+		return
+	}
+	_, ok = a.running[key]
+	if ok {
+		return
+	}
+	bucket := a.db.Bucket(key)
+	p := mapred.New(
+		a.name,
+		graphType,
+		graphName,
+		conf,
+		def,
+		bucket,
+		mapred.Send(a.send),
+		mapred.Listen(a.listen),
+	)
+	a.running[key] = p
+	a.logger.Printf("starting graph: %v.%v", graphType, graphName)
+	p.Run()
+}
+
+func (a *Actor) stopGraph(key string) {
+	p, ok := a.running[key]
+	if ok {
+		a.logger.Printf("stopping graph: %v", key)
+		p.Stop()
+	}
+}
+
+func (a *Actor) terminateGraph(key string) {
+	p, ok := a.running[key]
+	if ok {
+		a.logger.Printf("terminating graph: %v", key)
+		p.Stop()
 	}
 }

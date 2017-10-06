@@ -7,17 +7,17 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"sync"
 
 	"github.com/lytics/flo/source"
 )
 
-// FromFile reads JSON objects from the file. Parameter
-// prototype should be a non-pointer value of the type
-// to decode into, for example:
+// New json file source. Parameter prototype should be a non-pointer
+// value of the type to decode into, for example:
 //
 //     data, err := jsonfile.FromFile(MyType{}, "event.data")
 //
-func FromFile(prototype interface{}, name string) *Source {
+func New(prototype interface{}, name string) *Source {
 	return &Source{
 		meta: source.Metadata{
 			Name:       name,
@@ -29,6 +29,7 @@ func FromFile(prototype interface{}, name string) *Source {
 
 // Source from JSON encoded values.
 type Source struct {
+	mu        sync.Mutex
 	pos       int
 	f         *os.File
 	stream    *json.Decoder
@@ -38,11 +39,21 @@ type Source struct {
 
 // Metadata about source.
 func (s *Source) Metadata() source.Metadata {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	return s.meta
 }
 
 // Init the source.
 func (s *Source) Init() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.f != nil {
+		return nil
+	}
+
 	f, err := os.Open(s.meta.Name)
 	if err != nil {
 		return err
@@ -54,11 +65,24 @@ func (s *Source) Init() error {
 
 // Stop the source.
 func (s *Source) Stop() error {
-	return s.f.Close()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.f == nil {
+		return nil
+	}
+
+	f := s.f
+	s.f = nil
+
+	return f.Close()
 }
 
 // Take next value of the source.
 func (s *Source) Take(ctx context.Context) (source.ID, interface{}, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	select {
 	case <-ctx.Done():
 		return source.NoID, nil, context.DeadlineExceeded

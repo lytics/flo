@@ -1,16 +1,18 @@
 package source
 
-// WrapSources from a collection of sources.
-func WrapSources(ss ...Source) *WrappedSources {
-	return nil
+// SkipSetup for a collection of sources.
+func SkipSetup(ss ...Source) *SkipSetupSources {
+	return &SkipSetupSources{
+		ss: ss,
+	}
 }
 
-// WrappedSources that implement a no-op setup.
-type WrappedSources struct {
+// SkipSetupSources implements a no-op setup.
+type SkipSetupSources struct {
 	ss []Source
 }
 
-// Setup the sources.
-func (ws *WrappedSources) Setup(graphType, graphName string, conf []byte) ([]Source, error) {
-	return nil, nil
+// Setup the sources, but really do nothing.
+func (ws *SkipSetupSources) Setup(graphType, graphName string, conf []byte) ([]Source, error) {
+	return ws.ss, nil
 }
