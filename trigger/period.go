@@ -13,6 +13,7 @@ import (
 // AtPeriod period, in processing time, emit changes.
 func AtPeriod(period time.Duration) *Period {
 	return &Period{
+		stop:     make(chan bool),
 		delta:    false,
 		period:   period,
 		modified: map[string]bool{},
@@ -22,10 +23,10 @@ func AtPeriod(period time.Duration) *Period {
 
 type Period struct {
 	mu       sync.Mutex
+	stop     chan bool
 	delta    bool
 	period   time.Duration
 	logger   *log.Logger
-	ticker   *time.Ticker
 	modified map[string]bool
 }
 
@@ -40,7 +41,8 @@ func (t *Period) Modified(key string, v interface{}, vs map[window.Span][]interf
 }
 
 func (t *Period) Start(signal func(keys []string)) error {
-	t.ticker = time.NewTicker(t.period)
+	ticker := time.NewTicker(t.period)
+	defer ticker.Stop()
 
 	snapshot := func() []string {
 		t.mu.Lock()
@@ -55,14 +57,26 @@ func (t *Period) Start(signal func(keys []string)) error {
 		return keys
 	}
 
-	for range t.ticker.C {
-		signal(snapshot())
+	for {
+		select {
+		case <-t.stop:
+			return nil
+		case <-ticker.C:
+			signal(snapshot())
+		}
 	}
-	return nil
 }
 
 func (t *Period) Stop() {
-	t.ticker.Stop()
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	select {
+	case <-t.stop:
+		return
+	default:
+		close(t.stop)
+	}
 }
 
 func (t *Period) Delta() *Period {

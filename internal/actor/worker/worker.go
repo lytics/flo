@@ -73,9 +73,18 @@ func (a *Actor) Act(ctx context.Context) {
 		a.evalEvent(e)
 	}
 
+	defer func() {
+		for _, p := range a.running {
+			p.Stop()
+		}
+	}()
+
 	for {
 		select {
-		case e := <-events:
+		case e, open := <-events:
+			if !open {
+				return
+			}
 			a.evalEvent(e)
 		}
 	}
@@ -128,8 +137,13 @@ func (a *Actor) runGraph(key, graphType, graphName string, conf []byte) {
 		mapred.Listen(a.listen),
 	)
 	a.running[key] = p
-	a.logger.Printf("starting graph: %v.%v", graphType, graphName)
-	p.Run()
+	a.logger.Printf("starting graph: %v", key)
+	go func() {
+		err := p.Run()
+		if err != nil {
+			a.logger.Printf("graph: %v: failed: %v", key, err)
+		}
+	}()
 }
 
 func (a *Actor) stopGraph(key string) {

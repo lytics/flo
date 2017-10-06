@@ -100,6 +100,8 @@ func (p *Process) Run() error {
 }
 
 func (p *Process) runMap() error {
+	defer p.logger.Printf("mapper exiting")
+
 	for _, src := range p.sources {
 		select {
 		case <-p.ctx.Done():
@@ -117,6 +119,8 @@ func (p *Process) runMap() error {
 }
 
 func (p *Process) runRed() error {
+	defer p.logger.Printf("reducer exiting")
+
 	for {
 		select {
 		case <-p.ctx.Done():
@@ -145,6 +149,8 @@ func (p *Process) runRed() error {
 }
 
 func (p *Process) runTrig() error {
+	defer p.logger.Printf("trigger exiting")
+
 	signal := func(keys []string) {
 		p.db.Drain(keys, p.sinks[0].Give)
 	}
@@ -155,4 +161,5 @@ func (p *Process) runTrig() error {
 func (p *Process) Stop() {
 	p.def.Trigger().Stop()
 	p.cancel()
+	p.logger.Printf("stopping")
 }
