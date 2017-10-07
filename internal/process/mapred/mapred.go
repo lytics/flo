@@ -56,6 +56,11 @@ type Process struct {
 	receivers []string
 }
 
+// String description of process.
+func (p *Process) String() string {
+	return fmt.Sprintf("%v-%v", p.graphType, p.graphName)
+}
+
 // Run process.
 func (p *Process) Run() error {
 	p.logger.Printf("starting")
