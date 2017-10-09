@@ -12,6 +12,7 @@ func (m *Keyed) EventTime() time.Time {
 }
 
 func init() {
+	grid.Register(Term{})
 	grid.Register(Keyed{})
 	grid.Register(Progress{})
 }

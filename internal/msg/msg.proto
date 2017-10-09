@@ -17,3 +17,7 @@ message Progress {
 	bool Done = 4;
 	int64 MinEventTime = 5;
 }
+
+message Term {
+	repeated string Peers = 1;
+}

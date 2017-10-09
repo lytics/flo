@@ -7,10 +7,13 @@ import (
 	"time"
 
 	"github.com/lytics/flo/graph"
+	"github.com/lytics/flo/internal/msg"
 	"github.com/lytics/flo/internal/process/mapred"
 	"github.com/lytics/flo/internal/registry"
+	"github.com/lytics/flo/internal/schedule"
 	"github.com/lytics/flo/internal/txdb"
 	"github.com/lytics/grid"
+	"golang.org/x/sync/errgroup"
 )
 
 type Define func(graphType string) (*graph.Definition, bool)
@@ -29,6 +32,7 @@ func New(db *txdb.DB, d Define, s Send, l Listen, w Watch, p Peers, m Mailboxes)
 	return &Actor{
 		logger:    log.New(os.Stderr, "worker: ", log.LstdFlags),
 		running:   map[string]*mapred.Process{},
+		timeout:   10 * time.Second,
 		db:        db,
 		define:    d,
 		send:      s,
@@ -40,9 +44,13 @@ func New(db *txdb.DB, d Define, s Send, l Listen, w Watch, p Peers, m Mailboxes)
 }
 
 type Actor struct {
+	eg      *errgroup.Group
+	ctx     context.Context
+	ring    *schedule.Ring
 	name    string
 	logger  *log.Logger
 	running map[string]*mapred.Process
+	timeout time.Duration
 	// Outside world
 	db        *txdb.DB
 	define    Define
@@ -54,19 +62,64 @@ type Actor struct {
 }
 
 func (a *Actor) Act(ctx context.Context) {
-	defer a.logger.Printf("exiting")
+	defer a.logger.Print("exited")
 
 	name, err := grid.ContextActorName(ctx)
 	if err != nil {
 		a.logger.Printf("failed getting name: %v", err)
 	}
+	a.ctx = ctx
 	a.name = name
 	a.logger = log.New(os.Stderr, name+": ", log.LstdFlags)
+	a.logger.Print("running")
 
-	current, events, err := a.watch(ctx)
+	a.eg, a.ctx = errgroup.WithContext(ctx)
+	a.eg.Go(a.runTermWatcher)
+	a.eg.Go(a.runGraphWatcher)
+	err = a.eg.Wait()
+	if err != nil {
+		a.logger.Printf("failed with: %v", err)
+	}
+}
+
+func (a *Actor) runTermWatcher() error {
+	defer a.logger.Print("term watcher exited")
+	a.logger.Print("term watcher running")
+
+	timer := time.NewTimer(0 * time.Second)
+	errCnt := 0
+	for {
+		<-timer.C
+		res, err := a.send(a.timeout, "leader", &msg.Term{})
+		if err != nil {
+			errCnt++
+			a.logger.Printf("failed getting term: %v", err)
+		}
+		term, ok := res.(*msg.Term)
+		if !ok {
+			a.logger.Printf("unknonw response for term message: %T", res)
+		} else {
+			r, err := schedule.New(term.Peers)
+			if err != nil {
+				a.logger.Printf("failed creating ring from term: %v", err)
+			} else {
+				a.ring = r
+				a.logger.Printf("create ring: %v", r)
+				return nil
+			}
+		}
+		timer.Reset(5 * time.Second)
+	}
+}
+
+func (a *Actor) runGraphWatcher() error {
+	defer a.logger.Print("graph watcher exited")
+	a.logger.Print("graph watcher running")
+
+	current, events, err := a.watch(a.ctx)
 	if err != nil {
 		a.logger.Printf("failed watch: %v", err)
-		return
+		return err
 	}
 
 	for _, e := range current {
@@ -75,15 +128,18 @@ func (a *Actor) Act(ctx context.Context) {
 
 	defer func() {
 		for _, p := range a.running {
+			a.logger.Printf("stopping: %v", p)
 			p.Stop()
 		}
 	}()
 
 	for {
 		select {
+		case <-a.ctx.Done():
+			return nil
 		case e, open := <-events:
 			if !open {
-				return
+				return nil
 			}
 			a.evalEvent(e)
 		}
@@ -137,11 +193,11 @@ func (a *Actor) runGraph(key, graphType, graphName string, conf []byte) {
 		mapred.Listen(a.listen),
 	)
 	a.running[key] = p
-	a.logger.Printf("starting graph: %v", key)
+	a.logger.Printf("starting graph: %v", p)
 	go func() {
 		err := p.Run()
 		if err != nil {
-			a.logger.Printf("graph: %v: failed: %v", key, err)
+			a.logger.Printf("graph: %v: failed: %v", p, err)
 		}
 	}()
 }
@@ -149,7 +205,7 @@ func (a *Actor) runGraph(key, graphType, graphName string, conf []byte) {
 func (a *Actor) stopGraph(key string) {
 	p, ok := a.running[key]
 	if ok {
-		a.logger.Printf("stopping graph: %v", key)
+		a.logger.Printf("stopping graph: %v", p)
 		p.Stop()
 	}
 }
@@ -157,7 +213,7 @@ func (a *Actor) stopGraph(key string) {
 func (a *Actor) terminateGraph(key string) {
 	p, ok := a.running[key]
 	if ok {
-		a.logger.Printf("terminating graph: %v", key)
+		a.logger.Printf("terminating graph: %v", p)
 		p.Stop()
 	}
 }

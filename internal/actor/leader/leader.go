@@ -7,6 +7,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/lytics/flo/internal/msg"
+
 	"golang.org/x/sync/errgroup"
 
 	"github.com/lytics/flo/graph"
@@ -46,6 +48,7 @@ func New(db *txdb.DB, d Define, s Send, l Listen, w Watch, p Peers, m Mailboxes)
 type Actor struct {
 	eg      *errgroup.Group
 	ctx     context.Context
+	name    string
 	logger  *log.Logger
 	tracker *peerqueue.PeerQueue
 	// Outside world
@@ -58,27 +61,38 @@ type Actor struct {
 	listen    Listen
 }
 
+// String description of the actor.
+func (a *Actor) String() string {
+	return a.name
+}
+
 // Act as leader.
 func (a *Actor) Act(ctx context.Context) {
-	a.logger.Printf("running")
+	defer a.logger.Print("exited")
+
+	name, err := grid.ContextActorName(ctx)
+	if err != nil {
+		a.logger.Printf("failed getting name: %v", err)
+		return
+	}
+	a.name = name
+	a.logger = log.New(os.Stderr, name+": ", log.LstdFlags)
+	a.logger.Print("running")
 
 	a.eg, a.ctx = errgroup.WithContext(ctx)
 	a.eg.Go(a.runPeerWatcher)
+	a.eg.Go(a.runTermWatcher)
 	a.eg.Go(a.runMailboxWatcher)
-	err := a.eg.Wait()
+	err = a.eg.Wait()
 	if err != nil {
 		a.logger.Printf("failed with: %v", err)
 	}
-
-	a.logger.Printf("shutdown")
-}
-
-// String description of the watcher.
-func (a *Actor) String() string {
-	return "leader"
 }
 
 func (a *Actor) runPeerWatcher() error {
+	defer a.logger.Print("peer watcher exited")
+	a.logger.Print("peer watcher running")
+
 	current, peers, err := a.peers(a.ctx)
 	if err != nil {
 		return err
@@ -99,6 +113,7 @@ func (a *Actor) runPeerWatcher() error {
 				return e.Err()
 			case grid.EntityLost:
 				a.tracker.Dead(e.Peer())
+				a.tracker.UnsetRequired(e.Peer())
 			case grid.EntityFound:
 				a.tracker.Live(e.Peer())
 				a.tracker.SetRequired(workerDef(e.Peer()))
@@ -108,6 +123,9 @@ func (a *Actor) runPeerWatcher() error {
 }
 
 func (a *Actor) runMailboxWatcher() error {
+	defer a.logger.Print("mailbox watcher exited")
+	a.logger.Print("mailbox watcher running")
+
 	current, mailboxes, err := a.mailboxes(a.ctx)
 	if err != nil {
 		return err
@@ -116,38 +134,20 @@ func (a *Actor) runMailboxWatcher() error {
 		a.tracker.Register(c.Name(), c.Peer())
 	}
 
-	missingTimer := time.NewTimer(1 * time.Second)
+	missingTimer := time.NewTimer(500 * time.Millisecond)
 	defer missingTimer.Stop()
-
-	relocateTimer := time.NewTimer(10 * time.Minute)
-	defer relocateTimer.Stop()
 
 	for {
 		select {
 		case <-a.ctx.Done():
 			return nil
 		case <-missingTimer.C:
-			cnt := 0
 			for _, def := range a.tracker.Missing() {
-				cnt++
 				err := a.startActor(def)
 				if err != nil {
 					a.logger.Printf("failed to start actor: %v, error: %v", def.Name, err)
 				}
 			}
-			if cnt > 100 {
-				missingTimer.Reset(20 * time.Second)
-			} else {
-				missingTimer.Reset(10 * time.Second)
-			}
-		case <-relocateTimer.C:
-			a.logger.Printf("checking for relocations")
-			plan := a.tracker.Relocate()
-			a.logger.Printf("executing relocation plan: %v", plan)
-			for _, def := range plan.Relocations {
-				a.logger.Printf("relocating actor: %v", def.Name)
-			}
-			relocateTimer.Reset(10 * time.Minute)
 		case e := <-mailboxes:
 			a.logger.Printf("%v", e)
 			switch e.Type {
@@ -158,6 +158,37 @@ func (a *Actor) runMailboxWatcher() error {
 			case grid.EntityFound:
 				a.tracker.Register(e.Name(), e.Peer())
 			}
+		}
+	}
+}
+
+func (a *Actor) runTermWatcher() error {
+	defer a.logger.Print("term watcher exited")
+	a.logger.Print("term watcher running")
+
+	var term []string
+	for {
+		<-time.After(5 * time.Second)
+		for peer := range a.tracker.Peers() {
+			term = append(term, peer)
+		}
+		if len(term) > 0 {
+			break
+		}
+	}
+
+	events, close, err := a.listen(a.name)
+	if err != nil {
+		return err
+	}
+	defer close()
+
+	for {
+		select {
+		case <-a.ctx.Done():
+			return nil
+		case req := <-events:
+			req.Respond(&msg.Term{Peers: term})
 		}
 	}
 }

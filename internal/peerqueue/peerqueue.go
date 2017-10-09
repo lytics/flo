@@ -285,6 +285,18 @@ func (pq *PeerQueue) OptimisticallyDead(peer string) {
 	pq.recalculateSelector()
 }
 
+// Peers currently live.
+func (pq *PeerQueue) Peers() map[string]struct{} {
+	peers := map[string]struct{}{}
+	for peer, info := range pq.peers {
+		if info.state != live {
+			continue
+		}
+		peers[peer] = struct{}{}
+	}
+	return peers
+}
+
 // IsRegistered returns true if the actor has been
 // registered.
 func (pq *PeerQueue) IsRegistered(actor string) bool {
