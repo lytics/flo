@@ -80,7 +80,6 @@ configuration blob that can be passed to user defined code.
 ### Coordinating Data Sources
 What are the possible ways data can be consumed?
 
-#### Example Sources
 1.
 The source is something like PubSub, for example:
     g := graph.New()
@@ -111,7 +110,7 @@ system, there might be a problem. If there is one MapRed process
 per system then the behavior is correct, otherwise there is duplicate
 reading of each entry in the file.
 
-#### State, Worker and Process Layout
+### State, Worker and Process Layout
 1.
 How are workers started? Is there one worker per peer? Or are there
 possible multiple workers on each peer?
@@ -142,7 +141,22 @@ independently and then controlled via a ReplicationControler.
 It could even be a hybrid, there the reducer runs in a StatefulSet
 and the mappers run in a Deployment.
 
-#### Consequences of Design Choices
+### Ring Definition
+How to make sure that before sending any messages are sent everyone
+agrees on the ring layout?
+
+The leader starts, waits a bit b, and after time interval b uses
+the joined peers as a term T. For each peer p in T the leader starts
+a worker with T as configuration data. Each MapRed process started
+by a worker also receives the term T, from which it deterministically
+calculates the ring definition.
+
+When the leader starts it watches which workers exist already, and
+asks them about which term T they know of. When all individual workers
+answer with the same term T, the leader uses that T, otherwise the
+leader poisons everyone.
+
+### Consequences of Design Choices
 The consequences of the design choices above are at least some
 of the following:
 
