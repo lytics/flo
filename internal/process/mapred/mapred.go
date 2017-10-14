@@ -7,15 +7,15 @@ import (
 	"os"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/lytics/flo/graph"
 	"github.com/lytics/flo/internal/codec"
 	"github.com/lytics/flo/internal/msg"
+	"github.com/lytics/flo/internal/schedule"
 	"github.com/lytics/flo/internal/txdb"
 	"github.com/lytics/flo/sink"
 	"github.com/lytics/flo/source"
 	"github.com/lytics/grid"
+	"golang.org/x/sync/errgroup"
 )
 
 type Send func(timeout time.Duration, receiver string, msg interface{}) (interface{}, error)
@@ -23,7 +23,8 @@ type Send func(timeout time.Duration, receiver string, msg interface{}) (interfa
 type Listen func(name string) (<-chan grid.Request, func() error, error)
 
 // New map and reduce process.
-func New(id, graphType, graphName string, conf []byte, def *graph.Definition, db *txdb.Bucket, s Send, l Listen) *Process {
+func New(parent, graphType, graphName string, conf []byte, def *graph.Definition, db *txdb.Bucket, s Send, l Listen) *Process {
+	id := fmt.Sprintf("%v-%v-%v", parent, graphType, graphName)
 	return &Process{
 		id:        id,
 		graphType: graphType,
@@ -33,7 +34,8 @@ func New(id, graphType, graphName string, conf []byte, def *graph.Definition, db
 		conf:      conf,
 		send:      s,
 		listen:    l,
-		logger:    log.New(os.Stderr, id+"-"+graphType+"-"+graphName+": ", log.LstdFlags),
+		schedule:  make(chan *schedule.Ring),
+		logger:    log.New(os.Stderr, id+": ", log.LstdFlags),
 	}
 }
 
@@ -48,6 +50,8 @@ type Process struct {
 	def       *graph.Definition
 	conf      []byte
 	logger    *log.Logger
+	ring      *schedule.Ring
+	schedule  chan *schedule.Ring
 	send      Send
 	listen    Listen
 	sources   []source.Source
@@ -58,20 +62,18 @@ type Process struct {
 
 // String description of process.
 func (p *Process) String() string {
-	return fmt.Sprintf("%v-%v", p.graphType, p.graphName)
+	return p.id
 }
 
 // Run process.
 func (p *Process) Run() error {
 	p.logger.Printf("starting")
 
-	// TODO
-	// This is a global assumption, if the leader
-	// ever starts more or less of these then this
-	// is broken.
-	for i := 0; i < 10; i++ {
-		p.receivers = append(p.receivers, fmt.Sprintf("worker-%d-%v-%v", i, p.graphType, p.graphName))
+	r, open := <-p.schedule
+	if !open {
+		return fmt.Errorf("schedule closed before ever being defined")
 	}
+	p.ring = r
 
 	var err error
 
@@ -85,7 +87,8 @@ func (p *Process) Run() error {
 		return err
 	}
 
-	messages, close, err := p.listen(fmt.Sprintf("%v-%v-%v", p.id, p.graphType, p.graphName))
+	p.logger.Printf("reducer listening to mailbox: %v", p.id)
+	messages, close, err := p.listen(p.id)
 	if err != nil {
 		return err
 	}
@@ -104,9 +107,19 @@ func (p *Process) Run() error {
 	return eg.Wait()
 }
 
-func (p *Process) runMap() error {
-	defer p.logger.Printf("mapper exiting")
+func (p *Process) SetRing(r *schedule.Ring) {
+	select {
+	case p.schedule <- r:
+		p.logger.Printf("received ring: %v", r)
+	default:
+	}
+}
 
+func (p *Process) runMap() error {
+	defer p.logger.Print("mapper exiting")
+	p.logger.Print("mapper running")
+
+	p.logger.Printf("mapper consuming %v sources", len(p.sources))
 	for _, src := range p.sources {
 		select {
 		case <-p.ctx.Done():
@@ -125,6 +138,7 @@ func (p *Process) runMap() error {
 
 func (p *Process) runRed() error {
 	defer p.logger.Printf("reducer exiting")
+	p.logger.Print("reducer running")
 
 	for {
 		select {
@@ -155,6 +169,7 @@ func (p *Process) runRed() error {
 
 func (p *Process) runTrig() error {
 	defer p.logger.Printf("trigger exiting")
+	p.logger.Print("trigger running")
 
 	signal := func(keys []string) {
 		p.db.Drain(keys, p.sinks[0].Give)

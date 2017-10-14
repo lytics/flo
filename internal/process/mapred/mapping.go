@@ -1,7 +1,6 @@
 package mapred
 
 import (
-	"hash/fnv"
 	"io"
 	"time"
 
@@ -39,6 +38,7 @@ func (p *Process) consume(src source.Source) error {
 }
 
 func (p *Process) process(v interface{}) error {
+	p.logger.Printf("processing event: %T :: %v", v, v)
 	if v == nil {
 		return nil
 	}
@@ -76,7 +76,9 @@ func (p *Process) shuffle(key string, ts time.Time, v interface{}) error {
 	if err != nil {
 		return err
 	}
-	receiver := p.receiverByKey(key)
+	receiver := p.ring.Reducer(key, p.graphType, p.graphName)
+	p.logger.Printf("shuffling key: %v to %v", key, receiver)
+	
 	_, err = p.send(10*time.Second, receiver, &msg.Keyed{
 		TS:       ts.Unix(),
 		Key:      key,
@@ -84,11 +86,4 @@ func (p *Process) shuffle(key string, ts time.Time, v interface{}) error {
 		DataType: dataType,
 	})
 	return err
-}
-
-func (p *Process) receiverByKey(key string) string {
-	h := fnv.New64()
-	h.Write([]byte(key))
-	v := h.Sum64()
-	return p.receivers[int(v%uint64(len(p.receivers)))]
 }

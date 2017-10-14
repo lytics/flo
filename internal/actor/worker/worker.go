@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/lytics/flo/graph"
@@ -31,7 +32,7 @@ type Listen func(name string) (<-chan grid.Request, func() error, error)
 func New(db *txdb.DB, d Define, s Send, l Listen, w Watch, p Peers, m Mailboxes) (grid.Actor, error) {
 	return &Actor{
 		logger:    log.New(os.Stderr, "worker: ", log.LstdFlags),
-		running:   map[string]*mapred.Process{},
+		procs:     newProcesses(),
 		timeout:   10 * time.Second,
 		db:        db,
 		define:    d,
@@ -46,10 +47,9 @@ func New(db *txdb.DB, d Define, s Send, l Listen, w Watch, p Peers, m Mailboxes)
 type Actor struct {
 	eg      *errgroup.Group
 	ctx     context.Context
-	ring    *schedule.Ring
 	name    string
+	procs   *procs
 	logger  *log.Logger
-	running map[string]*mapred.Process
 	timeout time.Duration
 	// Outside world
 	db        *txdb.DB
@@ -103,9 +103,10 @@ func (a *Actor) runTermWatcher() error {
 			if err != nil {
 				a.logger.Printf("failed creating ring from term: %v", err)
 			} else {
-				a.ring = r
 				a.logger.Printf("create ring: %v", r)
-				return nil
+				for _, p := range a.procs.AllRunning() {
+					p.SetRing(r)
+				}
 			}
 		}
 		timer.Reset(5 * time.Second)
@@ -127,7 +128,7 @@ func (a *Actor) runGraphWatcher() error {
 	}
 
 	defer func() {
-		for _, p := range a.running {
+		for _, p := range a.procs.AllRunning() {
 			a.logger.Printf("stopping: %v", p)
 			p.Stop()
 		}
@@ -177,7 +178,7 @@ func (a *Actor) runGraph(key, graphType, graphName string, conf []byte) {
 	if !ok {
 		return
 	}
-	_, ok = a.running[key]
+	_, ok = a.procs.Running(key)
 	if ok {
 		return
 	}
@@ -192,7 +193,7 @@ func (a *Actor) runGraph(key, graphType, graphName string, conf []byte) {
 		mapred.Send(a.send),
 		mapred.Listen(a.listen),
 	)
-	a.running[key] = p
+	a.procs.SetRunning(key, p)
 	a.logger.Printf("starting graph: %v", p)
 	go func() {
 		err := p.Run()
@@ -203,7 +204,7 @@ func (a *Actor) runGraph(key, graphType, graphName string, conf []byte) {
 }
 
 func (a *Actor) stopGraph(key string) {
-	p, ok := a.running[key]
+	p, ok := a.procs.Running(key)
 	if ok {
 		a.logger.Printf("stopping graph: %v", p)
 		p.Stop()
@@ -211,9 +212,52 @@ func (a *Actor) stopGraph(key string) {
 }
 
 func (a *Actor) terminateGraph(key string) {
-	p, ok := a.running[key]
+	p, ok := a.procs.Running(key)
 	if ok {
 		a.logger.Printf("terminating graph: %v", p)
 		p.Stop()
 	}
+}
+
+func newProcesses() *procs {
+	return &procs{
+		running: map[string]*mapred.Process{},
+	}
+}
+
+type procs struct {
+	mu      sync.Mutex
+	running map[string]*mapred.Process
+}
+
+func (procs *procs) Running(key string) (*mapred.Process, bool) {
+	procs.mu.Lock()
+	defer procs.mu.Unlock()
+
+	p, ok := procs.running[key]
+	return p, ok
+}
+
+func (procs *procs) SetRunning(key string, p *mapred.Process) bool {
+	procs.mu.Lock()
+	defer procs.mu.Unlock()
+
+	_, ok := procs.running[key]
+	if !ok {
+		procs.running[key] = p
+		return true
+	}
+	return false
+}
+
+func (procs *procs) AllRunning() map[string]*mapred.Process {
+	procs.mu.Lock()
+	defer procs.mu.Unlock()
+
+	running := map[string]*mapred.Process{}
+	for k, v := range procs.running {
+		running[k] = v
+	}
+
+	return running
 }
