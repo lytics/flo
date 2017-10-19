@@ -74,6 +74,7 @@ func (p *Process) Run() error {
 		return fmt.Errorf("schedule closed before ever being defined")
 	}
 	p.ring = r
+	p.logger.Printf("received ring: %v", p.ring)
 
 	var err error
 
@@ -110,7 +111,6 @@ func (p *Process) Run() error {
 func (p *Process) SetRing(r *schedule.Ring) {
 	select {
 	case p.schedule <- r:
-		p.logger.Printf("received ring: %v", r)
 	default:
 	}
 }

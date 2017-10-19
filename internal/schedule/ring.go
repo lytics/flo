@@ -7,12 +7,12 @@ import "fmt"
 
 var (
 	// ErrEmptyTerm when a term of zero peers tries to schedule.
-	ErrEmptyTerm = errors.New("schedule: empty term")
+	ErrEmptyTerm = errors.New("schedule: empty Term")
 )
 
 const ringSize = 64
 
-// New ring based on term.
+// New ring based on term of peer names.
 func New(term []string) (*Ring, error) {
 	if len(term) == 0 {
 		return nil, ErrEmptyTerm
@@ -50,6 +50,9 @@ func (r *Ring) Reducer(key, graphType, graphName string) string {
 	h := fnv.New64()
 	h.Write([]byte(key))
 	i := h.Sum64()
-	p := r.ranges[i]
+	p, ok := r.ranges[i%ringSize]
+	if !ok {
+		panic("schedule: unexpected ring size")
+	}
 	return fmt.Sprintf("worker-%v-%v-%v", p, graphType, graphName)
 }

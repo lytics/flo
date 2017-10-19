@@ -103,13 +103,12 @@ func (a *Actor) runTermWatcher() error {
 			if err != nil {
 				a.logger.Printf("failed creating ring from term: %v", err)
 			} else {
-				a.logger.Printf("create ring: %v", r)
 				for _, p := range a.procs.AllRunning() {
 					p.SetRing(r)
 				}
 			}
 		}
-		timer.Reset(5 * time.Second)
+		timer.Reset(10 * time.Second)
 	}
 }
 
