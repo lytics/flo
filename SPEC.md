@@ -170,3 +170,10 @@ worker, and in turn the MapRed process, are fixed to the pod count.
 The MapRed process will need sub-processes to perform the reducing
 since the reducing actually represents a "ring" or "disjoint key
 space" that must be independent of the pod count.
+
+### TODO
+
+1.
+Use just one Event message type, currently there is 'Event' and
+'KeyedEvent' which have almost the same fields. It might be
+possible to merge into just one type that works for both cases.
