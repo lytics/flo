@@ -86,18 +86,10 @@ func (a *Actor) runTermWatcher() error {
 	defer a.logger.Print("term watcher exited")
 	a.logger.Print("term watcher running")
 
-	timer := time.NewTimer(0 * time.Second)
-	errCnt := 0
-	for {
-		<-timer.C
-		res, err := a.send(a.timeout, "leader", &msg.Term{})
-		if err != nil {
-			errCnt++
-			a.logger.Printf("failed getting term: %v", err)
-		}
-		term, ok := res.(*msg.Term)
+	propogate := func(v interface{}) {
+		term, ok := v.(*msg.Term)
 		if !ok {
-			a.logger.Printf("unknonw response for term message: %T", res)
+			a.logger.Printf("unknonw response for term message: %T", v)
 		} else {
 			r, err := schedule.New(term.Peers)
 			if err != nil {
@@ -108,7 +100,22 @@ func (a *Actor) runTermWatcher() error {
 				}
 			}
 		}
-		timer.Reset(10 * time.Second)
+	}
+
+	timer := time.NewTimer(0 * time.Second)
+	for {
+		select {
+		case <-a.ctx.Done():
+			return nil
+		case <-timer.C:
+			res, err := a.send(a.timeout, "leader", &msg.Term{})
+			if err != nil {
+				a.logger.Printf("failed getting term: %v", err)
+			} else {
+				propogate(res)
+			}
+			timer.Reset(10 * time.Second)
+		}
 	}
 }
 

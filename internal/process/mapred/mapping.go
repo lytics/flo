@@ -77,8 +77,6 @@ func (p *Process) shuffle(key string, ts time.Time, v interface{}) error {
 		return err
 	}
 	receiver := p.ring.Reducer(key, p.graphType, p.graphName)
-	p.logger.Printf("shuffling key: %v to %v", key, receiver)
-	
 	_, err = p.send(10*time.Second, receiver, &msg.Keyed{
 		TS:       ts.Unix(),
 		Key:      key,

@@ -11,11 +11,19 @@ import (
 	"github.com/coreos/etcd/clientv3"
 	"github.com/lytics/flo"
 	"github.com/lytics/flo/graph"
+	"github.com/lytics/flo/sink"
+	"github.com/lytics/flo/sink/funcsink"
+	"github.com/lytics/flo/source"
 	"github.com/lytics/flo/source/jsonfile"
 	"github.com/lytics/flo/trigger"
 	"github.com/lytics/flo/window"
 )
 
+// WithoutConf is a nil configuration for graphs.
+var WithoutConf = []byte(nil)
+
+// Entry exists just to map JSON
+// data to a struct.
 type Entry struct {
 	Timestamp string `json:"ts"`
 	User      string `json:"user"`
@@ -23,35 +31,63 @@ type Entry struct {
 }
 
 func main() {
-	g := graph.New("batch")
-	g.From(jsonfile.FromFile(Entry{}, "datafile/file1.data"))
+	// Define the graph of processig elements.
+	g := graph.New()
+	g.From(source.SkipSetup(jsonfile.New(Entry{}, "datafile/file1.data")))
 	g.Transform(clean)
-	g.GroupBy(user)
+	g.Group(user)
 	g.Window(window.Fixed(1 * time.Hour))
 	g.Trigger(trigger.WhenFinished())
-	g.Into(printer)
+	g.Into(sink.SkipSetup(funcsink.New(printer)))
 
+	// Register our message type, and graph type.
+	flo.RegisterMsg(Event{})
+	flo.RegisterGraph("batch", g)
+
+	// Create etcd v3 client.
 	etcd, err := clientv3.New(clientv3.Config{Endpoints: []string{"localhost:2379"}})
 	successOrDie(err)
 
-	op, err := flo.NewOperator(etcd, flo.OperatorCfg{Namespace: "example"})
+	// Create the flo config, the only required
+	// field is the namespace.
+	cfg := flo.Cfg{Namespace: "example"}
+
+	// Create the flo client.
+	client, err := flo.NewClient(etcd, cfg)
 	successOrDie(err)
 
+	// Create the flo server.
+	server, err := flo.NewServer(etcd, cfg)
+	successOrDie(err)
+
+	// Create a listener.
 	lis, err := net.Listen("tcp", "localhost:0")
 	successOrDie(err)
 
+	// Have the server serve our graphs.
 	go func() {
-		err := op.Serve(lis)
+		err := server.Serve(lis)
 		successOrDie(err)
 	}()
+	defer server.Stop()
 
-	op.RunGraph(g)
+	// Run a default instance of the batch graph.
+	// Multiple instances of the same graph type
+	// can be run, but in this example only one
+	// is run.
+	err = client.RunGraph("batch", "default", WithoutConf)
+	successOrDie(err)
+
+	// Wait for a user interrupt.
 	sig := make(chan os.Signal)
 	signal.Notify(sig, os.Interrupt)
 	<-sig
-	op.TerminateGraph(g)
 
-	op.Stop()
+	// Terminate the default instance of the batch graph.
+	err = client.TerminateGraph("batch", "default")
+	successOrDie(err)
+
+	fmt.Println("stopped, bye bye")
 }
 
 func clean(v interface{}) ([]graph.Event, error) {
@@ -61,7 +97,7 @@ func clean(v interface{}) ([]graph.Event, error) {
 		return nil, err
 	}
 	return []graph.Event{{
-		TS: ts,
+		Time: ts,
 		Msg: &Event{
 			Timestamp: e.Timestamp,
 			User:      e.User,
@@ -90,8 +126,4 @@ func successOrDie(err error) {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
-}
-
-func init() {
-	flo.Register(Event{})
 }

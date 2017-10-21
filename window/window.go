@@ -7,6 +7,14 @@ import (
 	"github.com/lytics/flo/merger"
 )
 
+// State of span and its values.
+type State interface {
+	Del(Span)
+	Get(Span) []interface{}
+	Set(Span, []interface{})
+	Spans() []Span
+}
+
 // NewSpan from the start and end times.
 func NewSpan(start, end time.Time) Span {
 	return Span{start.Unix(), end.Unix()}
@@ -85,7 +93,7 @@ func (s Span) Overlap(r Span) bool {
 // Window strategy.
 type Window interface {
 	Apply(ts time.Time) []Span
-	Merge(ts time.Time, vs []interface{}, ss map[Span][]interface{}, f merger.ManyMerger) error
+	Merge(ts time.Time, vs []interface{}, ss State, f merger.ManyMerger) error
 }
 
 // All of time window, which is considered to be the window of
@@ -113,13 +121,13 @@ func (w *all) Apply(time.Time) []Span {
 
 // Merge the new value vs into the universal window
 // in ss.
-func (w *all) Merge(ts time.Time, vs []interface{}, ss map[Span][]interface{}, f merger.ManyMerger) error {
-	vs0 := ss[w.universe]
+func (w *all) Merge(ts time.Time, vs []interface{}, ss State, f merger.ManyMerger) error {
+	vs0 := ss.Get(w.universe)
 	vs2, err := f(vs, vs0)
 	if err != nil {
 		return err
 	}
-	ss[w.universe] = vs2
+	ss.Set(w.universe, vs2)
 	return nil
 }
 
@@ -170,14 +178,14 @@ func (w *sliding) Apply(ts time.Time) []Span {
 
 // Merge the new value vs into the appropriate existing windows
 // found in ss.
-func (w *sliding) Merge(ts time.Time, vs []interface{}, ss map[Span][]interface{}, f merger.ManyMerger) error {
+func (w *sliding) Merge(ts time.Time, vs []interface{}, ss State, f merger.ManyMerger) error {
 	for _, tss := range w.Apply(ts) {
-		vs0 := ss[tss]
+		vs0 := ss.Get(tss)
 		vs2, err := f(vs, vs0)
 		if err != nil {
 			return err
 		}
-		ss[tss] = vs2
+		ss.Set(tss, vs2)
 	}
 	return nil
 }
@@ -208,7 +216,7 @@ func (w *session) Apply(ts time.Time) []Span {
 
 // Merge the new value vs into the appropriate existing
 // windows in ss, possibly expanding existing windows.
-func (w *session) Merge(ts time.Time, vs []interface{}, ss map[Span][]interface{}, f merger.ManyMerger) error {
+func (w *session) Merge(ts time.Time, vs []interface{}, ss State, f merger.ManyMerger) error {
 	var err error
 
 	// Create the session window.
@@ -219,7 +227,8 @@ func (w *session) Merge(ts time.Time, vs []interface{}, ss map[Span][]interface{
 	// merge the two together along with
 	// the data.
 	remove := map[Span]bool{}
-	for s0, vs0 := range ss {
+	for _, s0 := range ss.Spans() {
+		vs0 := ss.Get(s0)
 		if s.Overlap(s0) {
 			// Merge new data with existing
 			// data for overlapping windows.
@@ -239,12 +248,12 @@ func (w *session) Merge(ts time.Time, vs []interface{}, ss map[Span][]interface{
 	// that have been merged, since
 	// they are no longer valid.
 	for s0 := range remove {
-		delete(ss, s0)
+		ss.Del(s0)
 	}
 
 	// Put the new possibly expanded and
 	// merged session into the map.
-	ss[s] = vs
+	ss.Set(s, vs)
 
 	// Call it good.
 	return nil

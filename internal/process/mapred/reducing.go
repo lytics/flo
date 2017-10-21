@@ -7,7 +7,7 @@ import (
 
 func (p *Process) reduce(m graph.KeyedEvent) error {
 	return p.db.Apply(m.Key, func(row *txdb.Row) error {
-		err := p.def.Merge(&m, row.Windows)
+		err := p.def.Merge(&m, row)
 		if err != nil {
 			return err
 		}

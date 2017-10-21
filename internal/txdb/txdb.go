@@ -14,8 +14,29 @@ func newRow() *Row {
 
 // Row data for a key.
 type Row struct {
-	mu      sync.Mutex
-	Windows map[window.Span][]interface{}
+	mu       sync.Mutex
+	dataType string
+	Windows  map[window.Span][]interface{}
+}
+
+func (r *Row) Del(k window.Span) {
+	delete(r.Windows, k)
+}
+
+func (r *Row) Get(k window.Span) []interface{} {
+	return r.Windows[k]
+}
+
+func (r *Row) Set(k window.Span, v []interface{}) {
+	r.Windows[k] = v
+}
+
+func (r *Row) Spans() []window.Span {
+	ss := make([]window.Span, 0, len(r.Windows))
+	for k := range r.Windows {
+		ss = append(ss, k)
+	}
+	return ss
 }
 
 func (r *Row) Snapshot() *Row {
@@ -53,35 +74,16 @@ func (db *DB) Bucket(name string) *Bucket {
 // NewBucket in the database.
 func NewBucket(name string) *Bucket {
 	return &Bucket{
-		values:   map[string]*Row{},
-		finished: map[string]bool{},
+		values: map[string]*Row{},
 	}
 }
 
 // Bucket of key values organized into individual
 // windows of time.
 type Bucket struct {
-	mu       sync.Mutex
-	name     string
-	values   map[string]*Row
-	finished map[string]bool
-}
-
-// Finish with the named source.
-func (m *Bucket) Finish(name string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.finished[name] = true
-}
-
-// Finished sources.
-func (m *Bucket) Finished() map[string]bool {
-	snap := map[string]bool{}
-	for k := range m.finished {
-		snap[k] = true
-	}
-	return snap
+	mu     sync.Mutex
+	name   string
+	values map[string]*Row
 }
 
 // Drain the keys into the sink.
@@ -107,7 +109,7 @@ func (m *Bucket) fetchRowForMutation(key string) *Row {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Find the windows for this key.
+	// Find the row for this key.
 	row, ok := m.values[key]
 	if !ok {
 		row = newRow()

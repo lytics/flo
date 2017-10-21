@@ -11,6 +11,7 @@ import (
 
 func WhenFinished() *Finished {
 	return &Finished{
+		stop:     make(chan struct{}),
 		logger:   log.New(os.Stderr, "finished-trigger: ", log.LstdFlags),
 		modified: map[string]bool{},
 	}
@@ -18,6 +19,7 @@ func WhenFinished() *Finished {
 
 type Finished struct {
 	mu       sync.Mutex
+	stop     chan struct{}
 	logger   *log.Logger
 	signal   func([]string)
 	modified map[string]bool
@@ -52,8 +54,21 @@ func (t *Finished) Modified(key string, v interface{}, vs map[window.Span][]inte
 	return nil
 }
 
-func (t *Finished) Start(signal func(keys []string)) {
+func (t *Finished) Start(signal func(keys []string)) error {
 	t.signal = signal
+	<-t.stop
+	return nil
 }
 
-func (t *Finished) Stop() {}
+// Stop the trigger.
+func (t *Finished) Stop() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	select {
+	case <-t.stop:
+		return
+	default:
+		close(t.stop)
+	}
+}

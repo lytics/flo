@@ -130,7 +130,6 @@ func (p *Process) runMap() error {
 		if err != nil {
 			return err
 		}
-		p.db.Finish(src.Metadata().Name)
 	}
 
 	return nil

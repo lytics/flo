@@ -13,6 +13,7 @@ import (
 // WhenDormant after a given time, measured per key, emit changes.
 func WhenDormant(after time.Duration) *Dormant {
 	return &Dormant{
+		stop:     make(chan struct{}),
 		after:    after,
 		modified: map[string]time.Time{},
 		logger:   log.New(os.Stderr, "dormant-trigger: ", log.LstdFlags),
@@ -22,6 +23,7 @@ func WhenDormant(after time.Duration) *Dormant {
 // Dormant data trigger.
 type Dormant struct {
 	mu       sync.Mutex
+	stop     chan struct{}
 	after    time.Duration
 	delta    bool
 	logger   *log.Logger
@@ -41,7 +43,7 @@ func (t *Dormant) Modified(key string, v interface{}, vs map[window.Span][]inter
 }
 
 // Start the trigger, signalling changed keys with the signal function.
-func (t *Dormant) Start(signal func(keys []string)) {
+func (t *Dormant) Start(signal func(keys []string)) error {
 	freq := t.after / 100
 	if freq < 1*time.Second {
 		freq = 100 * time.Millisecond
@@ -63,16 +65,27 @@ func (t *Dormant) Start(signal func(keys []string)) {
 		return stale
 	}
 
-	go func() {
-		for now := range t.ticker.C {
+	for {
+		select {
+		case <-t.stop:
+			return nil
+		case now := <-t.ticker.C:
 			signal(snapshot(now))
 		}
-	}()
+	}
 }
 
 // Stop the trigger.
 func (t *Dormant) Stop() {
-	t.ticker.Stop()
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	select {
+	case <-t.stop:
+		return
+	default:
+		close(t.stop)
+	}
 }
 
 // Delta of current and previous value should be emitted.

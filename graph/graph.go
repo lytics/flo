@@ -139,12 +139,12 @@ func (def *Definition) GroupAndWindowBy(id string, ts time.Time, v interface{}) 
 
 // Merge the new keyed event ke, into existing windows representing
 // the same key.
-func (def *Definition) Merge(ke *KeyedEvent, windows map[window.Span][]interface{}) error {
+func (def *Definition) Merge(e *KeyedEvent, prev window.State) error {
 	f := merger.Cons()
 	if def.g.merger != nil {
 		f = merger.Fold(def.g.merger)
 	}
-	return def.g.window.Merge(ke.Time, []interface{}{ke.Msg}, windows, f)
+	return def.g.window.Merge(e.Time, []interface{}{e.Msg}, prev, f)
 }
 
 // Trigger definition.
