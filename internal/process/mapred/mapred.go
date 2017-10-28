@@ -18,20 +18,22 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+type Open func(name string) (*txdb.DB, error)
+
 type Send func(timeout time.Duration, receiver string, msg interface{}) (interface{}, error)
 
 type Listen func(name string) (<-chan grid.Request, func() error, error)
 
 // New map and reduce process.
-func New(parent, graphType, graphName string, conf []byte, def *graph.Definition, db *txdb.Bucket, s Send, l Listen) *Process {
+func New(parent, graphType, graphName string, conf []byte, def *graph.Definition, o Open, s Send, l Listen) *Process {
 	id := fmt.Sprintf("%v-%v-%v", parent, graphType, graphName)
 	return &Process{
 		id:        id,
 		graphType: graphType,
 		graphName: graphName,
-		db:        db,
 		def:       def,
 		conf:      conf,
+		open:      o,
 		send:      s,
 		listen:    l,
 		schedule:  make(chan *schedule.Ring),
@@ -46,12 +48,13 @@ type Process struct {
 	graphName string
 	ctx       context.Context
 	cancel    func()
-	db        *txdb.Bucket
+	db        *txdb.DB
 	def       *graph.Definition
 	conf      []byte
 	logger    *log.Logger
 	ring      *schedule.Ring
 	schedule  chan *schedule.Ring
+	open      Open
 	send      Send
 	listen    Listen
 	sources   []source.Source
@@ -69,14 +72,19 @@ func (p *Process) String() string {
 func (p *Process) Run() error {
 	p.logger.Printf("starting")
 
+	var err error
+
+	p.db, err = p.open(p.id)
+	if err != nil {
+		return err
+	}
+
 	r, open := <-p.schedule
 	if !open {
 		return fmt.Errorf("schedule closed before ever being defined")
 	}
 	p.ring = r
 	p.logger.Printf("received ring: %v", p.ring)
-
-	var err error
 
 	p.sources, err = p.def.From().Setup(p.graphType, p.graphName, p.conf)
 	if err != nil {

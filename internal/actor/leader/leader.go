@@ -31,11 +31,10 @@ type Send func(timeout time.Duration, receiver string, msg interface{}) (interfa
 type Listen func(name string) (<-chan grid.Request, func() error, error)
 
 // New peer watcher.
-func New(db *txdb.DB, d Define, s Send, l Listen, w Watch, p Peers, m Mailboxes) (*Actor, error) {
+func New(d Define, s Send, l Listen, w Watch, p Peers, m Mailboxes) (*Actor, error) {
 	return &Actor{
 		logger:    log.New(os.Stderr, "leader: ", log.LstdFlags),
 		tracker:   peerqueue.New(),
-		db:        db,
 		define:    d,
 		send:      s,
 		listen:    l,

@@ -20,12 +20,10 @@ func NewServer(etcd *etcdv3.Client, cfg Cfg) (*Server, error) {
 		return nil, ErrInvalidNamespace
 	}
 
-	db := txdb.New(cfg.Namespace)
 	logger := log.New(os.Stdout, cfg.Namespace+": ", log.LstdFlags)
 
 	s := &Server{
 		cfg:    &cfg,
-		db:     db,
 		etcd:   etcd,
 		logger: logger,
 	}
@@ -54,7 +52,12 @@ func NewServer(etcd *etcdv3.Client, cfg Cfg) (*Server, error) {
 	}
 	s.registry = reg
 
+	open := func(name string) (*txdb.DB, error) {
+		return txdb.Open(cfg.Driver, name)
+	}
+
 	send := client.Request
+
 	listen := func(name string) (<-chan grid.Request, func() error, error) {
 		mailbox, err := grid.NewMailbox(server, name, 100)
 		if err != nil {
@@ -62,19 +65,21 @@ func NewServer(etcd *etcdv3.Client, cfg Cfg) (*Server, error) {
 		}
 		return mailbox.C, mailbox.Close, nil
 	}
+
 	watch := func(ctx context.Context) ([]*registry.WatchEvent, <-chan *registry.WatchEvent, error) {
 		return reg.Watch(ctx)
 	}
+
 	peers := func(ctx context.Context) ([]*grid.QueryEvent, <-chan *grid.QueryEvent, error) {
 		return client.QueryWatch(ctx, grid.Peers)
 	}
+
 	mailboxes := func(ctx context.Context) ([]*grid.QueryEvent, <-chan *grid.QueryEvent, error) {
 		return client.QueryWatch(ctx, grid.Actors)
 	}
 
 	server.RegisterDef("leader", func([]byte) (grid.Actor, error) {
 		return leader.New(
-			db,
 			LookupGraph,
 			leader.Send(send),
 			leader.Listen(listen),
@@ -82,10 +87,11 @@ func NewServer(etcd *etcdv3.Client, cfg Cfg) (*Server, error) {
 			leader.Peers(peers),
 			leader.Mailboxes(mailboxes))
 	})
+
 	server.RegisterDef("worker", func([]byte) (grid.Actor, error) {
 		return worker.New(
-			db,
 			LookupGraph,
+			worker.Open(open),
 			worker.Send(send),
 			worker.Listen(listen),
 			worker.Watch(watch),
@@ -98,7 +104,6 @@ func NewServer(etcd *etcdv3.Client, cfg Cfg) (*Server, error) {
 
 type Server struct {
 	mu        sync.Mutex
-	db        *txdb.DB
 	cfg       *Cfg
 	etcd      *etcdv3.Client
 	client    *grid.Client

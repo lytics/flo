@@ -17,6 +17,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+type Open func(name string) (*txdb.DB, error)
+
 type Define func(graphType string) (*graph.Definition, bool)
 
 type Watch func(ctx context.Context) ([]*registry.WatchEvent, <-chan *registry.WatchEvent, error)
@@ -29,12 +31,12 @@ type Send func(timeout time.Duration, receiver string, msg interface{}) (interfa
 
 type Listen func(name string) (<-chan grid.Request, func() error, error)
 
-func New(db *txdb.DB, d Define, s Send, l Listen, w Watch, p Peers, m Mailboxes) (grid.Actor, error) {
+func New(d Define, o Open, s Send, l Listen, w Watch, p Peers, m Mailboxes) (grid.Actor, error) {
 	return &Actor{
 		logger:    log.New(os.Stderr, "worker: ", log.LstdFlags),
 		procs:     newProcesses(),
 		timeout:   10 * time.Second,
-		db:        db,
+		open:      o,
 		define:    d,
 		send:      s,
 		listen:    l,
@@ -52,7 +54,7 @@ type Actor struct {
 	logger  *log.Logger
 	timeout time.Duration
 	// Outside world
-	db        *txdb.DB
+	open      Open
 	define    Define
 	watch     Watch
 	peers     Peers
@@ -188,14 +190,13 @@ func (a *Actor) runGraph(key, graphType, graphName string, conf []byte) {
 	if ok {
 		return
 	}
-	bucket := a.db.Bucket(key)
 	p := mapred.New(
 		a.name,
 		graphType,
 		graphName,
 		conf,
 		def,
-		bucket,
+		mapred.Open(a.open),
 		mapred.Send(a.send),
 		mapred.Listen(a.listen),
 	)

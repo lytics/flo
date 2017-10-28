@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package badgerdriver;
+
+message Vector {
+	string DataType = 1;
+	repeated bytes Data = 2;
+}

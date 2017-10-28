@@ -11,7 +11,7 @@ type State interface {
 	Del(Span)
 	Get(Span) []interface{}
 	Set(Span, []interface{})
-	Spans() []Span
+	Spans() map[Span][]interface{}
 }
 
 // Window strategy.

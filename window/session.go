@@ -43,7 +43,7 @@ func (w *session) Merge(ts time.Time, vs []interface{}, ss State, f merger.ManyM
 	// merge the two together along with
 	// the data.
 	remove := map[Span]bool{}
-	for _, s0 := range ss.Spans() {
+	for s0 := range ss.Spans() {
 		vs0 := ss.Get(s0)
 		if s.Overlap(s0) {
 			// Merge new data with existing

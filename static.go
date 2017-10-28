@@ -9,6 +9,7 @@ import (
 
 // Cfg where the only required parameter is the namespace.
 type Cfg struct {
+	Driver    string
 	Namespace string
 }
 

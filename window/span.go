@@ -1,13 +1,34 @@
 package window
 
 import (
+	"encoding/binary"
 	"fmt"
 	"time"
+)
+
+var (
+	zero = Span{}
 )
 
 // NewSpan from the start and end times.
 func NewSpan(start, end time.Time) Span {
 	return Span{start.Unix(), end.Unix()}
+}
+
+// NewSpanFromKey produced by a previous call to Key.
+func NewSpanFromKey(key []byte) (Span, error) {
+	if key[8] != ':' {
+		return zero, fmt.Errorf("span: not a valid span key")
+	}
+	t0 := int64(binary.BigEndian.Uint64(key[0:8]))
+	t1 := int64(binary.BigEndian.Uint64(key[9:17]))
+	if t0 < 0 {
+		return zero, fmt.Errorf("span: negative time value")
+	}
+	if t1 < 0 {
+		return zero, fmt.Errorf("span: negative time value")
+	}
+	return Span{t0, t1}, nil
 }
 
 // Span of time defining a window. The first element
@@ -23,6 +44,21 @@ func (s Span) Start() time.Time {
 // End of the span.
 func (s Span) End() time.Time {
 	return time.Unix(s[1], 0)
+}
+
+// Key of span usable as a datastore identifier.
+func (s Span) Key() ([]byte, error) {
+	if s[0] < 0 {
+		return nil, fmt.Errorf("span: negative time value")
+	}
+	if s[1] < 0 {
+		return nil, fmt.Errorf("span: negative time value")
+	}
+	key := make([]byte, 8+8+1)
+	binary.BigEndian.PutUint64(key[0:], uint64(s[0]))
+	key[8] = ':'
+	binary.BigEndian.PutUint64(key[9:], uint64(s[1]))
+	return key, nil
 }
 
 // String of the span.
