@@ -8,7 +8,7 @@ import (
 )
 
 func init() {
-	txdb.Register("bolt", &drvr{})
+	txdb.Register("bigtable", &drvr{})
 }
 
 type drvr struct{}
@@ -19,14 +19,12 @@ func (d *drvr) Open(name string) (driver.Conn, error) {
 		return nil, err
 	}
 	return &Conn{
-		table:  client.Open(""),
-		bucket: "default",
+		table: client.Open(""),
 	}, nil
 }
 
 type Conn struct {
-	table  *bigtable.Table
-	bucket string
+	table *bigtable.Table
 }
 
 func (c *Conn) Apply(key string, mut func(window.State) error) error {
@@ -48,8 +46,4 @@ func (c *Conn) Apply(key string, mut func(window.State) error) error {
 
 func (c *Conn) Drain(keys []string, sink func(span window.Span, key string, vs []interface{}) error) {
 
-}
-
-func (c *Conn) bucketKey() []byte {
-	return []byte(c.bucket)
 }

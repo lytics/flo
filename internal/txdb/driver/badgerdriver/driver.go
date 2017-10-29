@@ -19,14 +19,12 @@ func (d *drvr) Open(name string) (driver.Conn, error) {
 		return nil, err
 	}
 	return &Conn{
-		db:     db,
-		bucket: "default",
+		db: db,
 	}, nil
 }
 
 type Conn struct {
-	db     *badger.DB
-	bucket string
+	db *badger.DB
 }
 
 func (c *Conn) Apply(key string, mut func(window.State) error) error {
@@ -49,8 +47,4 @@ func (c *Conn) Apply(key string, mut func(window.State) error) error {
 
 func (c *Conn) Drain(keys []string, sink func(span window.Span, key string, vs []interface{}) error) {
 
-}
-
-func (c *Conn) bucketKey() []byte {
-	return []byte(c.bucket)
 }
