@@ -48,8 +48,8 @@ func (c *Conn) Apply(key string, mut func(window.State) error) error {
 	})
 }
 
-func (c *Conn) Drain(keys []string, sink func(span window.Span, key string, vs []interface{}) error) {
-
+func (c *Conn) Drain(keys []string, sink driver.Sink) error {
+	return nil
 }
 
 func (c *Conn) bucketKey() []byte {

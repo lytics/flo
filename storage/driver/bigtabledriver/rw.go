@@ -1,4 +1,4 @@
-package boltdriver
+package bigtabledriver
 
 import (
 	"cloud.google.com/go/bigtable"
@@ -20,16 +20,16 @@ type rw struct {
 }
 
 func (rw *rw) DelSpan(s window.Span) error {
-	k, err := encodeKey(s, rw)
+	k, err := encodeKey(s)
 	if err != nil {
 		return err
 	}
-	rw.mut.DeleteCellsInColumn("window", s.String())
+	rw.mut.DeleteCellsInColumn(windowFamily, k)
 	return nil
 }
 
 func (rw *rw) PutSpan(s window.Span, vs []interface{}) error {
-	k, err := encodeKey(s, rw)
+	k, err := encodeKey(s)
 	if err != nil {
 		return err
 	}
@@ -37,7 +37,7 @@ func (rw *rw) PutSpan(s window.Span, vs []interface{}) error {
 	if err != nil {
 		return err
 	}
-	rw.mut.Set("window", k, bigtable.ServerTime, v)
+	rw.mut.Set(windowFamily, k, bigtable.ServerTime, v)
 	return nil
 }
 
@@ -48,8 +48,8 @@ func (rw *rw) Windows() (map[window.Span][]interface{}, error) {
 	}
 	ts := map[window.Span]bigtable.Timestamp{}
 	snap := map[window.Span][]interface{}{}
-	for _, item := range row["window"] {
-		k, err := decodeKey(item.Column, rw)
+	for _, item := range row[windowFamily] {
+		k, err := decodeKey(item.Column)
 		if err != nil {
 			return nil, err
 		}

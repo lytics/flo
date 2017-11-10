@@ -1,4 +1,4 @@
-package boltdriver
+package bigtabledriver
 
 import (
 	"fmt"
@@ -8,35 +8,13 @@ import (
 	"github.com/lytics/grid/codec"
 )
 
-func encodeKey(s window.Span, rw *rw) (string, error) {
+func encodeKey(s window.Span) (string, error) {
 	sk, err := s.Key()
-	if err != nil {
-		return "", err
-	}
-
-	sl := len(sk)
-	pl := len(rw.prefix)
-	fl := pl + 1 + sl
-
-	fk := make([]byte, fl)
-
-	// Expected format: <previx>@<span>
-	copy(fk[0:], rw.prefix)
-	fk[pl] = '@'
-	copy(fk[pl+1:], sk)
-
-	return string(fk), nil
+	return string(sk), err
 }
 
-func decodeKey(kb string, rw *rw) (window.Span, error) {
-	pl := len(rw.prefix)
-
-	// Expected format: <prefix>@<span>
-	if kb[pl] != '@' {
-		return window.Span{}, fmt.Errorf("invalid key: %x", kb)
-	}
-
-	return window.NewSpanFromKey([]byte(kb[pl+1:]))
+func decodeKey(kb string) (window.Span, error) {
+	return window.NewSpanFromKey([]byte(kb))
 }
 
 func encodeVal(vs []interface{}) ([]byte, error) {

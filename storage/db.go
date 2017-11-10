@@ -51,6 +51,6 @@ func (db *DB) Apply(key string, mutation func(window.State) error) error {
 }
 
 // Drain the keys into the sink.
-func (db *DB) Drain(keys []string, sink func(span window.Span, key string, vs []interface{}) error) {
-	db.conn.Drain(keys, sink)
+func (db *DB) Drain(keys []string, sink func(span window.Span, key string, vs []interface{}) error) error {
+	return db.conn.Drain(keys, sink)
 }

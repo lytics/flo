@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package boltdriver;
+package bigtabledriver;
 
 message Vector {
 	string DataType = 1;
