@@ -124,8 +124,8 @@ func (p *Process) SetRing(r *schedule.Ring) {
 }
 
 func (p *Process) runMap() error {
-	defer p.logger.Print("mapper exiting")
 	p.logger.Print("mapper running")
+	defer p.logger.Print("mapper exited")
 
 	p.logger.Printf("mapper consuming %v sources", len(p.sources))
 	for _, src := range p.sources {
@@ -144,8 +144,8 @@ func (p *Process) runMap() error {
 }
 
 func (p *Process) runRed() error {
-	defer p.logger.Printf("reducer exiting")
 	p.logger.Print("reducer running")
+	defer p.logger.Printf("reducer exited")
 
 	for {
 		select {
@@ -175,8 +175,8 @@ func (p *Process) runRed() error {
 }
 
 func (p *Process) runTrig() error {
-	defer p.logger.Printf("trigger exiting")
 	p.logger.Print("trigger running")
+	defer p.logger.Printf("trigger exited")
 
 	signal := func(keys []string) {
 		p.db.Drain(keys, p.sinks[0].Give)

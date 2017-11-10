@@ -40,7 +40,11 @@ func (c *Conn) Apply(key string, mut func(window.State) error) error {
 		return err
 	}
 
-	row.Flush()
+	err = row.Flush()
+	if err != nil {
+		return err
+	}
+
 	return rw.flush()
 }
 

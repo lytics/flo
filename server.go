@@ -19,6 +19,9 @@ func NewServer(etcd *etcdv3.Client, cfg Cfg) (*Server, error) {
 	if cfg.Namespace == "" {
 		return nil, ErrInvalidNamespace
 	}
+	if cfg.Driver == "" {
+		cfg.Driver = "mem"
+	}
 
 	logger := log.New(os.Stdout, cfg.Namespace+": ", log.LstdFlags)
 

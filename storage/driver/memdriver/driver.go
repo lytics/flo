@@ -44,7 +44,12 @@ func (c *Conn) Apply(key string, mut func(window.State) error) error {
 		return err
 	}
 
-	return mut(row)
+	err = mut(row)
+	if err != nil {
+		return err
+	}
+
+	return row.Flush()
 }
 
 func (c *Conn) Drain(keys []string, sink func(span window.Span, key string, vs []interface{}) error) {

@@ -45,16 +45,12 @@ type DB struct {
 	conn driver.Conn
 }
 
-// Apply the mutation to the graph key's row.
+// Apply the mutation.
 func (db *DB) Apply(key string, mutation func(window.State) error) error {
 	return db.conn.Apply(key, mutation)
 }
 
 // Drain the keys into the sink.
 func (db *DB) Drain(keys []string, sink func(span window.Span, key string, vs []interface{}) error) {
-	// for key, row := range m.snapshot(keys) {
-	// 	for span, vs := range row.Windows {
-	// 		sink(span, key, vs)
-	// 	}
-	// }
+	db.conn.Drain(keys, sink)
 }

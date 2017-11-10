@@ -15,6 +15,7 @@ import (
 	"github.com/lytics/flo/sink/funcsink"
 	"github.com/lytics/flo/source"
 	"github.com/lytics/flo/source/jsonfile"
+	_ "github.com/lytics/flo/storage/driver/memdriver"
 	"github.com/lytics/flo/trigger"
 	"github.com/lytics/flo/window"
 )
