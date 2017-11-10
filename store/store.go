@@ -1,10 +1,10 @@
-package txdb
+package store
 
 import (
 	"fmt"
 	"sync"
 
-	"github.com/lytics/flo/internal/txdb/driver"
+	"github.com/lytics/flo/store/driver"
 	"github.com/lytics/flo/window"
 )
 
