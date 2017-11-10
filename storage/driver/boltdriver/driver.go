@@ -1,10 +1,11 @@
 package boltdriver
 
 import (
+	"context"
+
 	"github.com/boltdb/bolt"
 	"github.com/lytics/flo/storage"
 	"github.com/lytics/flo/storage/driver"
-	"github.com/lytics/flo/window"
 )
 
 func init() {
@@ -29,7 +30,7 @@ type Conn struct {
 	bucket string
 }
 
-func (c *Conn) Apply(key string, mut func(window.State) error) error {
+func (c *Conn) Apply(ctx context.Context, key string, mut driver.Mutation) error {
 	return c.db.Batch(func(tx *bolt.Tx) error {
 		bk := tx.Bucket(c.bucketKey())
 		rw := newRW(key, bk)
@@ -48,7 +49,7 @@ func (c *Conn) Apply(key string, mut func(window.State) error) error {
 	})
 }
 
-func (c *Conn) Drain(keys []string, sink driver.Sink) error {
+func (c *Conn) Drain(ctx context.Context, keys []string, sink driver.Sink) error {
 	return nil
 }
 

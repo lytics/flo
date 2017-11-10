@@ -1,11 +1,11 @@
 package memdriver
 
 import (
+	"context"
 	"sync"
 
 	"github.com/lytics/flo/storage"
 	"github.com/lytics/flo/storage/driver"
-	"github.com/lytics/flo/window"
 )
 
 func init() {
@@ -27,7 +27,7 @@ type Conn struct {
 	data map[string]*rw
 }
 
-func (c *Conn) Apply(key string, mut func(window.State) error) error {
+func (c *Conn) Apply(ctx context.Context, key string, mut driver.Mutation) error {
 	c.mu.Lock()
 	rw, ok := c.data[key]
 	if !ok {
@@ -52,7 +52,7 @@ func (c *Conn) Apply(key string, mut func(window.State) error) error {
 	return row.Flush()
 }
 
-func (c *Conn) Drain(keys []string, sink driver.Sink) error {
+func (c *Conn) Drain(ctx context.Context, keys []string, sink driver.Sink) error {
 	snap := map[string]*rw{}
 
 	c.mu.Lock()
@@ -69,7 +69,7 @@ func (c *Conn) Drain(keys []string, sink driver.Sink) error {
 		defer rw.mu.Unlock()
 
 		for s, vs := range rw.windows {
-			err := sink(s, rw.key, vs)
+			err := sink(ctx, s, rw.key, vs)
 			if err != nil {
 				return err
 			}

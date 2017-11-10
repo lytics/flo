@@ -1,6 +1,8 @@
 package driver
 
 import (
+	"context"
+
 	"github.com/lytics/flo/window"
 )
 
@@ -12,8 +14,8 @@ type Driver interface {
 
 // Conn is a handle to a datastore connection.
 type Conn interface {
-	Apply(key string, mut func(window.State) error) error
-	Drain(keys []string, sink Sink) error
+	Apply(ctx context.Context, key string, mut Mutation) error
+	Drain(ctx context.Context, keys []string, sink Sink) error
 }
 
 // ReadWriter of single row data.
@@ -24,4 +26,7 @@ type ReadWriter interface {
 }
 
 // Sink for data output.
-type Sink func(span window.Span, key string, vs []interface{}) error
+type Sink func(ctx context.Context, span window.Span, key string, vs []interface{}) error
+
+// Mutation of window state.
+type Mutation func(window.State) error

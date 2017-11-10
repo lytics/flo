@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -107,7 +108,7 @@ func user(v interface{}) (string, error) {
 	return v.(*Event).User, nil
 }
 
-func print(span window.Span, key string, vs []interface{}) error {
+func print(ctx context.Context, span window.Span, key string, vs []interface{}) error {
 	var buf bytes.Buffer
 	buf.WriteString(fmt.Sprintf("session: %v\n", span))
 	for _, v := range vs {

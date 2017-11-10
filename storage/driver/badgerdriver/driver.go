@@ -1,10 +1,11 @@
 package badgerdriver
 
 import (
+	"context"
+
 	"github.com/dgraph-io/badger"
 	"github.com/lytics/flo/storage"
 	"github.com/lytics/flo/storage/driver"
-	"github.com/lytics/flo/window"
 )
 
 func init() {
@@ -27,7 +28,7 @@ type Conn struct {
 	db *badger.DB
 }
 
-func (c *Conn) Apply(key string, mut func(window.State) error) error {
+func (c *Conn) Apply(ctx context.Context, key string, mut driver.Mutation) error {
 	return c.db.Update(func(txn *badger.Txn) error {
 		rw := newRW(key, txn)
 
@@ -45,6 +46,6 @@ func (c *Conn) Apply(key string, mut func(window.State) error) error {
 	})
 }
 
-func (c *Conn) Drain(keys []string, sink driver.Sink) error {
+func (c *Conn) Drain(ctx context.Context, keys []string, sink driver.Sink) error {
 	return nil
 }

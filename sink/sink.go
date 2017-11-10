@@ -1,6 +1,10 @@
 package sink
 
-import "github.com/lytics/flo/window"
+import (
+	"context"
+
+	"github.com/lytics/flo/window"
+)
 
 // Sinks of data.
 type Sinks interface {
@@ -15,6 +19,6 @@ type Sink interface {
 	// Stop the sink and clean up. Stop is only
 	// called if Init has been called.
 	Stop() error
-	// Give next items to sink.
-	Give(w window.Span, key string, vs []interface{}) error
+	// Give key and values to sink.
+	Give(ctx context.Context, w window.Span, key string, vs []interface{}) error
 }

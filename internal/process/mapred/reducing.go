@@ -13,5 +13,5 @@ func (p *Process) reduce(m graph.KeyedEvent) error {
 		}
 		return p.def.Trigger().Modified(m.Key, m.Msg, s.Spans())
 	}
-	return p.db.Apply(m.Key, mut)
+	return p.db.Apply(p.ctx, m.Key, mut)
 }

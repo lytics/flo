@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -36,7 +37,7 @@ func main() {
 	g.Transform(clean)
 	g.Window(window.Sliding(1*time.Hour, 1*time.Hour))
 	g.Trigger(trigger.AtPeriod(10 * time.Second))
-	g.Into(sink.SkipSetup(funcsink.New(printer)))
+	g.Into(sink.SkipSetup(funcsink.New(print)))
 
 	// Register our message type, and graph type.
 	flo.RegisterMsg(Event{})
@@ -104,7 +105,7 @@ func clean(v interface{}) ([]graph.Event, error) {
 	}}, nil
 }
 
-func printer(span window.Span, key string, vs []interface{}) error {
+func print(ctx context.Context, span window.Span, key string, vs []interface{}) error {
 	var buf bytes.Buffer
 	buf.WriteString(fmt.Sprintf("window: %v\n", span))
 	for _, v := range vs {

@@ -1,11 +1,11 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
 	"github.com/lytics/flo/storage/driver"
-	"github.com/lytics/flo/window"
 )
 
 var (
@@ -46,11 +46,11 @@ type DB struct {
 }
 
 // Apply the mutation.
-func (db *DB) Apply(key string, mutation func(window.State) error) error {
-	return db.conn.Apply(key, mutation)
+func (db *DB) Apply(ctx context.Context, key string, mut driver.Mutation) error {
+	return db.conn.Apply(ctx, key, mut)
 }
 
 // Drain the keys into the sink.
-func (db *DB) Drain(keys []string, sink func(span window.Span, key string, vs []interface{}) error) error {
-	return db.conn.Drain(keys, sink)
+func (db *DB) Drain(ctx context.Context, keys []string, sink driver.Sink) error {
+	return db.conn.Drain(ctx, keys, sink)
 }

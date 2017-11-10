@@ -1,10 +1,11 @@
 package bigtabledriver
 
 import (
+	"context"
+
 	"cloud.google.com/go/bigtable"
 	"github.com/lytics/flo/storage"
 	"github.com/lytics/flo/storage/driver"
-	"github.com/lytics/flo/window"
 )
 
 func init() {
@@ -27,7 +28,7 @@ type Conn struct {
 	table *bigtable.Table
 }
 
-func (c *Conn) Apply(key string, mut func(window.State) error) error {
+func (c *Conn) Apply(ctx context.Context, key string, mut driver.Mutation) error {
 	rw := newRW(key, c.table)
 
 	row, err := driver.NewRow(rw)
@@ -48,6 +49,6 @@ func (c *Conn) Apply(key string, mut func(window.State) error) error {
 	return rw.flush()
 }
 
-func (c *Conn) Drain(keys []string, sink driver.Sink) error {
+func (c *Conn) Drain(ctx context.Context, keys []string, sink driver.Sink) error {
 	return nil
 }

@@ -179,7 +179,7 @@ func (p *Process) runTrig() error {
 	defer p.logger.Printf("trigger exited")
 
 	signal := func(keys []string) {
-		p.db.Drain(keys, p.sinks[0].Give)
+		p.db.Drain(p.ctx, keys, p.sinks[0].Give)
 	}
 	return p.def.Trigger().Start(signal)
 }

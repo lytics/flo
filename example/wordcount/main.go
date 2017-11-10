@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -8,15 +9,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lytics/flo/sink"
-	"github.com/lytics/flo/sink/funcsink"
-
 	"github.com/coreos/etcd/clientv3"
 	"github.com/lytics/flo"
 	"github.com/lytics/flo/graph"
+	"github.com/lytics/flo/sink"
+	"github.com/lytics/flo/sink/funcsink"
 	"github.com/lytics/flo/source"
 	"github.com/lytics/flo/source/linefile"
 	"github.com/lytics/flo/source/md5id"
+	_ "github.com/lytics/flo/storage/driver/memdriver"
 	"github.com/lytics/flo/trigger"
 	"github.com/lytics/flo/window"
 )
@@ -32,7 +33,7 @@ func main() {
 	g.Group(word)
 	g.Merger(adder)
 	g.Trigger(trigger.AtPeriod(1 * time.Second))
-	g.Into(sink.SkipSetup(funcsink.New(printer)))
+	g.Into(sink.SkipSetup(funcsink.New(print)))
 
 	// Register our message type, and graph type.
 	flo.RegisterMsg(Word{})
@@ -125,7 +126,7 @@ func adder(a, b interface{}) (interface{}, error) {
 	return aw, nil
 }
 
-func printer(span window.Span, key string, vs []interface{}) error {
+func print(ctx context.Context, span window.Span, key string, vs []interface{}) error {
 	for _, v := range vs {
 		w := v.(*Word)
 		fmt.Printf("word: %20v, count: %10d, time window: %v\n", w.Text, w.Count, span)
