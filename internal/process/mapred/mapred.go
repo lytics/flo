@@ -72,6 +72,11 @@ func (p *Process) String() string {
 func (p *Process) Run() error {
 	p.logger.Printf("starting")
 
+	ctx, cancel := context.WithCancel(context.Background())
+	eg, ctx := errgroup.WithContext(ctx)
+	p.ctx = ctx
+	p.cancel = cancel
+
 	var err error
 
 	p.db, err = p.open(p.id)
@@ -103,11 +108,6 @@ func (p *Process) Run() error {
 	}
 	defer close()
 	p.messages = messages
-
-	ctx, cancel := context.WithCancel(context.Background())
-	eg, ctx := errgroup.WithContext(ctx)
-	p.ctx = ctx
-	p.cancel = cancel
 
 	eg.Go(p.runMap)
 	eg.Go(p.runRed)
