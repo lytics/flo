@@ -2,6 +2,7 @@ package flo
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -19,8 +20,8 @@ func NewServer(etcd *etcdv3.Client, cfg Cfg) (*Server, error) {
 	if cfg.Namespace == "" {
 		return nil, ErrInvalidNamespace
 	}
-	if cfg.Driver == "" {
-		cfg.Driver = "mem"
+	if cfg.Driver == nil {
+		return nil, ErrInvalidStorage
 	}
 
 	logger := log.New(os.Stdout, cfg.Namespace+": ", log.LstdFlags)
@@ -56,7 +57,7 @@ func NewServer(etcd *etcdv3.Client, cfg Cfg) (*Server, error) {
 	s.registry = reg
 
 	open := func(name string) (*storage.DB, error) {
-		return storage.Open(cfg.Driver, name)
+		return storage.Open(fmt.Sprintf("%v-%v", cfg.Namespace, name), cfg.Driver)
 	}
 
 	send := client.Request

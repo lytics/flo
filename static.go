@@ -5,17 +5,18 @@ import (
 
 	"github.com/lytics/flo/graph"
 	"github.com/lytics/flo/internal/codec"
+	"github.com/lytics/flo/storage/driver"
 )
 
 // Cfg where the only required parameter is the namespace.
 type Cfg struct {
-	Driver    string
+	Driver    driver.Cfg
 	Namespace string
 }
 
 var (
-	mu     sync.Mutex
-	graphs map[string]*graph.Definition
+	graphsMu sync.Mutex
+	graphs   map[string]*graph.Definition
 )
 
 func init() {
@@ -29,8 +30,8 @@ func RegisterMsg(v interface{}) error {
 
 // RegisterGraph of the given graph type.
 func RegisterGraph(graphType string, g *graph.Graph) error {
-	mu.Lock()
-	defer mu.Unlock()
+	graphsMu.Lock()
+	defer graphsMu.Unlock()
 
 	if graphType == "" {
 		return ErrInvalidGraphType
@@ -50,8 +51,8 @@ func RegisterGraph(graphType string, g *graph.Graph) error {
 
 // LookupGraph definition that was previously registered.
 func LookupGraph(graphType string) (*graph.Definition, bool) {
-	mu.Lock()
-	defer mu.Unlock()
+	graphsMu.Lock()
+	defer graphsMu.Unlock()
 
 	def, ok := graphs[graphType]
 	return def, ok

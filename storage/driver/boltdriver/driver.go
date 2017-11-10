@@ -2,27 +2,66 @@ package boltdriver
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path"
 
 	"github.com/boltdb/bolt"
 	"github.com/lytics/flo/storage"
 	"github.com/lytics/flo/storage/driver"
 )
 
+const (
+	// DriverName used for driver registration.
+	DriverName = "bolt"
+)
+
 func init() {
-	storage.Register("bolt", &drvr{})
+	storage.Register(DriverName, &drvr{})
 }
 
 type drvr struct{}
 
-func (d *drvr) Open(name string) (driver.Conn, error) {
-	db, err := bolt.Open(name, 600, bolt.DefaultOptions)
+func (d *drvr) Open(name string, cfg driver.Cfg) (driver.Conn, error) {
+	boltCfg, ok := cfg.(Cfg)
+	if !ok {
+		return nil, fmt.Errorf("boltdriver: unknown configuration type: %T", cfg)
+	}
+
+	// Location of database.
+	loc := path.Join(boltCfg.BaseDir, name)
+
+	// File mode of database.
+	mod := os.FileMode(600)
+	if boltCfg.FileMode > 0 {
+		mod = boltCfg.FileMode
+	}
+
+	// Options for database.
+	opt := bolt.DefaultOptions
+	if boltCfg.Options != nil {
+		opt = boltCfg.Options
+	}
+
+	db, err := bolt.Open(loc, mod, opt)
 	if err != nil {
 		return nil, err
 	}
-	return &Conn{
+
+	c := &Conn{
 		db:     db,
 		bucket: "default",
-	}, nil
+	}
+
+	err = db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists(c.bucketKey())
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return c, nil
 }
 
 type Conn struct {
@@ -50,7 +89,27 @@ func (c *Conn) Apply(ctx context.Context, key string, mut driver.Mutation) error
 }
 
 func (c *Conn) Drain(ctx context.Context, keys []string, sink driver.Sink) error {
-	return nil
+	return c.db.View(func(tx *bolt.Tx) error {
+		bk := tx.Bucket(c.bucketKey())
+
+		for _, key := range keys {
+			rw := newRW(key, bk)
+
+			row, err := driver.NewRow(rw)
+			if err != nil {
+				return err
+			}
+
+			for s, vs := range row.Spans() {
+				err := sink(ctx, s, key, vs)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		return nil
+	})
 }
 
 func (c *Conn) bucketKey() []byte {

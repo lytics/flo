@@ -16,7 +16,7 @@ import (
 	"github.com/lytics/flo/sink/funcsink"
 	"github.com/lytics/flo/source"
 	"github.com/lytics/flo/source/jsonfile"
-	_ "github.com/lytics/flo/storage/driver/memdriver"
+	"github.com/lytics/flo/storage/driver/boltdriver"
 	"github.com/lytics/flo/trigger"
 	"github.com/lytics/flo/window"
 )
@@ -47,7 +47,13 @@ func main() {
 
 	// Create the flo config, the only required
 	// field is the namespace.
-	cfg := flo.Cfg{Namespace: "example"}
+	cfg := flo.Cfg{
+		Driver: boltdriver.Cfg{
+			BaseDir:  "/tmp",
+			FileMode: 600,
+		},
+		Namespace: "example",
+	}
 
 	// Create the flo client.
 	client, err := flo.NewClient(etcd, cfg)

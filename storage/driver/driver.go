@@ -9,7 +9,7 @@ import (
 // Driver for datastore operations on time windows
 // and their associated data.
 type Driver interface {
-	Open(name string) (Conn, error)
+	Open(name string, cfg Cfg) (Conn, error)
 }
 
 // Conn is a handle to a datastore connection.

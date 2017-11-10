@@ -26,14 +26,14 @@ func Register(name string, d driver.Driver) {
 }
 
 // Open a new database connection.
-func Open(driverName, sourceName string) (*DB, error) {
-	drvr, ok := drivers[driverName]
+func Open(name string, cfg driver.Cfg) (*DB, error) {
+	drvr, ok := drivers[cfg.Driver()]
 	if !ok {
-		return nil, fmt.Errorf("storage: unknown driver: %v", driverName)
+		return nil, fmt.Errorf("storage: unknown driver: %v", cfg.Driver())
 	}
-	conn, err := drvr.Open(sourceName)
+	conn, err := drvr.Open(name, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("storage: failed to open connection: %v", err)
+		return nil, fmt.Errorf("storage: failed to open: %v", err)
 	}
 	return &DB{
 		conn: conn,

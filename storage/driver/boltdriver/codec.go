@@ -4,9 +4,13 @@ import (
 	"fmt"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/lytics/flo/internal/codec"
 	"github.com/lytics/flo/window"
-	"github.com/lytics/grid/codec"
 )
+
+func init() {
+	codec.Register(Vector{})
+}
 
 func encodeKey(s window.Span, rw *rw) ([]byte, error) {
 	sk, err := s.Key()
@@ -20,7 +24,7 @@ func encodeKey(s window.Span, rw *rw) ([]byte, error) {
 
 	fk := make([]byte, fl)
 
-	// Expected format: <previx>@<span>
+	// Expected format: <prefix>@<span>
 	copy(fk[0:], rw.prefix)
 	fk[pl] = '@'
 	copy(fk[pl+1:], sk)
@@ -45,13 +49,13 @@ func encodeVal(vs []interface{}) ([]byte, error) {
 	for _, v := range vs {
 		datumType, datum, err := codec.Marshal(v)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("boltdriver: failed to encode: %v", err)
 		}
 		if dataType == "" {
 			dataType = datumType
 		}
 		if dataType != datumType {
-			return nil, fmt.Errorf("invalid encoded data type: %v, expected: %v", datumType, dataType)
+			return nil, fmt.Errorf("boltdriver: invalid encoded data type: %v, expected: %v", datumType, dataType)
 		}
 		vec.Data = append(vec.Data, datum)
 	}
@@ -71,7 +75,7 @@ func decodeVal(vb []byte) ([]interface{}, error) {
 	for _, e := range vec.Data {
 		v, err := codec.Unmarshal(e, vec.DataType)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("boltdriver: failed to decode: %v", err)
 		}
 		res = append(res, v)
 	}

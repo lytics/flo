@@ -14,16 +14,14 @@ func init() {
 
 type drvr struct{}
 
-func (d *drvr) Open(name string) (driver.Conn, error) {
+func (d *drvr) Open(name string, cfg driver.Cfg) (driver.Conn, error) {
 	return &Conn{
-		name: name,
 		data: map[string]*rw{},
 	}, nil
 }
 
 type Conn struct {
 	mu   sync.Mutex
-	name string
 	data map[string]*rw
 }
 
