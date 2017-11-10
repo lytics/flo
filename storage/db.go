@@ -1,10 +1,10 @@
-package store
+package storage
 
 import (
 	"fmt"
 	"sync"
 
-	"github.com/lytics/flo/store/driver"
+	"github.com/lytics/flo/storage/driver"
 	"github.com/lytics/flo/window"
 )
 
@@ -13,14 +13,14 @@ var (
 	drivers   = map[string]driver.Driver{}
 )
 
-// Register a database driver.
+// Register a storage driver.
 func Register(name string, d driver.Driver) {
 	driversMu.Lock()
 	defer driversMu.Unlock()
 
 	_, ok := drivers[name]
 	if ok {
-		panic("txdb: driver registered twice: " + name)
+		panic("storage: driver registered twice: " + name)
 	}
 	drivers[name] = d
 }
@@ -29,11 +29,11 @@ func Register(name string, d driver.Driver) {
 func Open(driverName, sourceName string) (*DB, error) {
 	drvr, ok := drivers[driverName]
 	if !ok {
-		return nil, fmt.Errorf("txdb: unknown driver: %v", driverName)
+		return nil, fmt.Errorf("storage: unknown driver: %v", driverName)
 	}
 	conn, err := drvr.Open(sourceName)
 	if err != nil {
-		return nil, fmt.Errorf("txdb: failed to open connection: %v", err)
+		return nil, fmt.Errorf("storage: failed to open connection: %v", err)
 	}
 	return &DB{
 		conn: conn,

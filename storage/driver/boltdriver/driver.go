@@ -2,13 +2,13 @@ package boltdriver
 
 import (
 	"github.com/boltdb/bolt"
-	"github.com/lytics/flo/internal/txdb"
-	"github.com/lytics/flo/internal/txdb/driver"
+	"github.com/lytics/flo/storage"
+	"github.com/lytics/flo/storage/driver"
 	"github.com/lytics/flo/window"
 )
 
 func init() {
-	txdb.Register("bolt", &drvr{})
+	storage.Register("bolt", &drvr{})
 }
 
 type drvr struct{}

@@ -11,14 +11,14 @@ import (
 	"github.com/lytics/flo/internal/codec"
 	"github.com/lytics/flo/internal/msg"
 	"github.com/lytics/flo/internal/schedule"
-	"github.com/lytics/flo/internal/txdb"
 	"github.com/lytics/flo/sink"
 	"github.com/lytics/flo/source"
+	"github.com/lytics/flo/storage"
 	"github.com/lytics/grid"
 	"golang.org/x/sync/errgroup"
 )
 
-type Open func(name string) (*txdb.DB, error)
+type Open func(name string) (*storage.DB, error)
 
 type Send func(timeout time.Duration, receiver string, msg interface{}) (interface{}, error)
 
@@ -48,7 +48,7 @@ type Process struct {
 	graphName string
 	ctx       context.Context
 	cancel    func()
-	db        *txdb.DB
+	db        *storage.DB
 	def       *graph.Definition
 	conf      []byte
 	logger    *log.Logger

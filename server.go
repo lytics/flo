@@ -11,7 +11,7 @@ import (
 	"github.com/lytics/flo/internal/actor/leader"
 	"github.com/lytics/flo/internal/actor/worker"
 	"github.com/lytics/flo/internal/registry"
-	"github.com/lytics/flo/internal/txdb"
+	"github.com/lytics/flo/storage"
 	"github.com/lytics/grid"
 )
 
@@ -52,8 +52,8 @@ func NewServer(etcd *etcdv3.Client, cfg Cfg) (*Server, error) {
 	}
 	s.registry = reg
 
-	open := func(name string) (*txdb.DB, error) {
-		return txdb.Open(cfg.Driver, name)
+	open := func(name string) (*storage.DB, error) {
+		return storage.Open(cfg.Driver, name)
 	}
 
 	send := client.Request

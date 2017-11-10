@@ -2,13 +2,13 @@ package badgerdriver
 
 import (
 	"github.com/dgraph-io/badger"
-	"github.com/lytics/flo/internal/txdb"
-	"github.com/lytics/flo/internal/txdb/driver"
+	"github.com/lytics/flo/storage"
+	"github.com/lytics/flo/storage/driver"
 	"github.com/lytics/flo/window"
 )
 
 func init() {
-	txdb.Register("badger", &drvr{})
+	storage.Register("badger", &drvr{})
 }
 
 type drvr struct{}

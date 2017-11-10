@@ -7,15 +7,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/lytics/flo/internal/msg"
-
-	"golang.org/x/sync/errgroup"
-
 	"github.com/lytics/flo/graph"
+	"github.com/lytics/flo/internal/msg"
 	"github.com/lytics/flo/internal/peerqueue"
 	"github.com/lytics/flo/internal/registry"
-	"github.com/lytics/flo/internal/txdb"
+	"github.com/lytics/flo/storage"
 	"github.com/lytics/grid"
+	"golang.org/x/sync/errgroup"
 )
 
 type Define func(graphType string) (*graph.Definition, bool)
@@ -51,7 +49,7 @@ type Actor struct {
 	logger  *log.Logger
 	tracker *peerqueue.PeerQueue
 	// Outside world
-	db        *txdb.DB
+	db        *storage.DB
 	define    Define
 	watch     Watch
 	peers     Peers

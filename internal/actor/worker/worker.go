@@ -12,12 +12,12 @@ import (
 	"github.com/lytics/flo/internal/process/mapred"
 	"github.com/lytics/flo/internal/registry"
 	"github.com/lytics/flo/internal/schedule"
-	"github.com/lytics/flo/internal/txdb"
+	"github.com/lytics/flo/storage"
 	"github.com/lytics/grid"
 	"golang.org/x/sync/errgroup"
 )
 
-type Open func(name string) (*txdb.DB, error)
+type Open func(name string) (*storage.DB, error)
 
 type Define func(graphType string) (*graph.Definition, bool)
 

@@ -2,13 +2,13 @@ package boltdriver
 
 import (
 	"cloud.google.com/go/bigtable"
-	"github.com/lytics/flo/txdb"
-	"github.com/lytics/flo/txdb/driver"
+	"github.com/lytics/flo/storage"
+	"github.com/lytics/flo/storage/driver"
 	"github.com/lytics/flo/window"
 )
 
 func init() {
-	txdb.Register("bigtable", &drvr{})
+	storage.Register("bigtable", &drvr{})
 }
 
 type drvr struct{}
