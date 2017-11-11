@@ -30,10 +30,10 @@ func New(term []string) (*Ring, error) {
 	sort.Strings(term)
 
 	r := &Ring{
-		parts: make(map[uint64]string, ringSize),
+		peers: make(map[uint64]string, ringSize),
 	}
 	for i := uint64(0); i < ringSize; i++ {
-		r.parts[i] = sorted[int(i)%len(sorted)]
+		r.peers[i] = sorted[int(i)%len(sorted)]
 	}
 
 	return r, nil
@@ -41,7 +41,7 @@ func New(term []string) (*Ring, error) {
 
 // Ring formed by assignment of partitions to workers.
 type Ring struct {
-	parts map[uint64]string
+	peers map[uint64]string
 }
 
 // Reducer of the given key in a specific graph.
@@ -51,10 +51,10 @@ func (r *Ring) Reducer(key, graphType, graphName string) string {
 	i := h.Sum64()
 
 	// INVARIANT
-	p, ok := r.parts[i%ringSize]
+	peer, ok := r.peers[i%ringSize]
 	if !ok {
 		panic("schedule: unexpected ring size")
 	}
 
-	return fmt.Sprintf("worker-%v-%v-%v", p, graphType, graphName)
+	return fmt.Sprintf("worker-%v-%v-%v", peer, graphType, graphName)
 }
