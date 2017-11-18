@@ -85,6 +85,7 @@ func (p *Process) Run() error {
 		return err
 	}
 
+	p.logger.Printf("waiting for ring")
 	r, open := <-p.schedule
 	if !open {
 		return fmt.Errorf("schedule closed before ever being defined")
@@ -102,7 +103,6 @@ func (p *Process) Run() error {
 		return err
 	}
 
-	p.logger.Printf("reducer listening to mailbox: %v", p.id)
 	messages, close, err := p.listen(p.id)
 	if err != nil {
 		return err

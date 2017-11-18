@@ -79,6 +79,7 @@ func (a *Actor) Act(ctx context.Context) {
 	a.eg, a.ctx = errgroup.WithContext(ctx)
 	a.eg.Go(a.runPeerWatcher)
 	a.eg.Go(a.runTermWatcher)
+	a.eg.Go(a.runWorkerWatcher)
 	a.eg.Go(a.runMailboxWatcher)
 	err = a.eg.Wait()
 	if err != nil {
@@ -123,6 +124,31 @@ func (a *Actor) runPeerWatcher() error {
 	}
 }
 
+func (a *Actor) runWorkerWatcher() error {
+	defer a.logger.Print("worker watcher exited")
+	a.logger.Print("worker watcher running")
+
+	missingTimer := time.NewTimer(1 * time.Second)
+	defer missingTimer.Stop()
+
+	for {
+		select {
+		case <-a.ctx.Done():
+			return nil
+		case <-missingTimer.C:
+			for _, def := range a.tracker.Missing() {
+				err := a.startActor(def)
+				if err != nil {
+					a.logger.Printf("worker watcher: failed to start actor: %v, error: %v", def.Name, err)
+				} else {
+					a.logger.Printf("worker watcher: starting actor: %v", def.Name)
+				}
+			}
+			missingTimer.Reset(1 * time.Second)
+		}
+	}
+}
+
 func (a *Actor) runMailboxWatcher() error {
 	defer a.logger.Print("mailbox watcher exited")
 	a.logger.Print("mailbox watcher running")
@@ -135,23 +161,10 @@ func (a *Actor) runMailboxWatcher() error {
 		a.tracker.Register(c.Name(), c.Peer())
 	}
 
-	missingTimer := time.NewTimer(1 * time.Second)
-	defer missingTimer.Stop()
-
 	for {
 		select {
 		case <-a.ctx.Done():
 			return nil
-		case <-missingTimer.C:
-			a.logger.Printf("mailbox watcher: checking missing")
-			for _, def := range a.tracker.Missing() {
-				err := a.startActor(def)
-				if err != nil {
-					a.logger.Printf("mailbox watcher: failed to start actor: %v, error: %v", def.Name, err)
-				} else {
-					a.logger.Printf("mailbox watcher: starting actor: %v", def.Name)
-				}
-			}
 		case e := <-mailboxes:
 			switch e.Type {
 			case grid.WatchError:
@@ -159,7 +172,6 @@ func (a *Actor) runMailboxWatcher() error {
 			case grid.EntityLost:
 				a.tracker.Unregister(e.Name())
 			case grid.EntityFound:
-				a.logger.Printf("mailbox watcher: found mailbox: %v, on peer: %v", e.Name(), e.Peer())
 				a.tracker.Register(e.Name(), e.Peer())
 			}
 		}

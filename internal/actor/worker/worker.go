@@ -155,8 +155,6 @@ func (a *Actor) runGraphWatcher() error {
 }
 
 func (a *Actor) evalEvent(e *registry.WatchEvent) {
-	a.logger.Printf("got event: %v", e)
-
 	if e == nil || e.Reg == nil {
 		return
 	}

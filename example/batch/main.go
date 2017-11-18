@@ -88,7 +88,7 @@ func main() {
 	err = client.TerminateGraph("batch", "default")
 	successOrDie(err)
 
-	fmt.Println("stopped, bye bye")
+	fmt.Println("killed, bye bye")
 }
 
 func clean(v interface{}) ([]graph.Event, error) {
