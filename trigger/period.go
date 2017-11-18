@@ -40,7 +40,7 @@ func (t *Period) Modified(key string, v interface{}, vs map[window.Span][]interf
 	return nil
 }
 
-func (t *Period) Start(signal func(keys []string)) error {
+func (t *Period) Start(signal func(keys []string) error) error {
 	ticker := time.NewTicker(t.period)
 	defer ticker.Stop()
 
@@ -62,7 +62,10 @@ func (t *Period) Start(signal func(keys []string)) error {
 		case <-t.stop:
 			return nil
 		case <-ticker.C:
-			signal(snapshot())
+			err := signal(snapshot())
+			if err != nil {
+				return err
+			}
 		}
 	}
 }

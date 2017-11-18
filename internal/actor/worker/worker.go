@@ -185,10 +185,6 @@ func (a *Actor) runGraph(key, graphType, graphName string, conf []byte) {
 	if !ok {
 		return
 	}
-	_, ok = a.procs.Running(key)
-	if ok {
-		return
-	}
 	p := mapred.New(
 		a.name,
 		graphType,
@@ -199,29 +195,20 @@ func (a *Actor) runGraph(key, graphType, graphName string, conf []byte) {
 		mapred.Send(a.send),
 		mapred.Listen(a.listen),
 	)
-	a.procs.SetRunning(key, p)
-	a.logger.Printf("starting graph: %v", p)
-	go func() {
-		err := p.Run()
-		if err != nil {
-			a.logger.Printf("graph: %v: failed: %v", p, err)
-		}
-	}()
+	a.procs.Start(key, p)
 }
 
 func (a *Actor) stopGraph(key string) {
-	p, ok := a.procs.Running(key)
+	ok := a.procs.Stop(key)
 	if ok {
-		a.logger.Printf("stopping graph: %v", p)
-		p.Stop()
+		a.logger.Printf("stopping graph: %v", key)
 	}
 }
 
 func (a *Actor) terminateGraph(key string) {
-	p, ok := a.procs.Running(key)
+	ok := a.procs.Stop(key)
 	if ok {
-		a.logger.Printf("terminating graph: %v", p)
-		p.Stop()
+		a.logger.Printf("terminating graph: %v", key)
 	}
 }
 
@@ -236,24 +223,41 @@ type procs struct {
 	running map[string]*mapred.Process
 }
 
-func (procs *procs) Running(key string) (*mapred.Process, bool) {
+func (procs *procs) Stop(key string) bool {
 	procs.mu.Lock()
 	defer procs.mu.Unlock()
 
 	p, ok := procs.running[key]
-	return p, ok
+	if ok {
+		p.Stop()
+	}
+	return ok
 }
 
-func (procs *procs) SetRunning(key string, p *mapred.Process) bool {
+func (procs *procs) Start(key string, p *mapred.Process) bool {
 	procs.mu.Lock()
 	defer procs.mu.Unlock()
 
 	_, ok := procs.running[key]
 	if !ok {
 		procs.running[key] = p
-		return true
+
+		go func() {
+			l := log.New(os.Stderr, p.String()+": ", log.LstdFlags)
+
+			defer func() {
+				procs.mu.Lock()
+				defer procs.mu.Unlock()
+				delete(procs.running, key)
+			}()
+
+			err := p.Run()
+			if err != nil {
+				l.Printf("failed: %v", err)
+			}
+		}()
 	}
-	return false
+	return ok
 }
 
 func (procs *procs) AllRunning() map[string]*mapred.Process {

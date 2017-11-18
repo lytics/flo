@@ -18,7 +18,7 @@ func AtCount(count int) *Count {
 }
 
 type Count struct {
-	signal   func([]string)
+	signal   func([]string) error
 	count    int
 	delta    bool
 	logger   *log.Logger
@@ -38,7 +38,7 @@ func (t *Count) Modified(key string, v interface{}, vs map[window.Span][]interfa
 	return nil
 }
 
-func (t *Count) Start(signal func(keys []string)) error {
+func (t *Count) Start(signal func(keys []string) error) error {
 	t.signal = signal
 	return nil
 }

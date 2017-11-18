@@ -135,7 +135,7 @@ func (a *Actor) runMailboxWatcher() error {
 		a.tracker.Register(c.Name(), c.Peer())
 	}
 
-	missingTimer := time.NewTimer(4 * time.Second)
+	missingTimer := time.NewTimer(1 * time.Second)
 	defer missingTimer.Stop()
 
 	for {

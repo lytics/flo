@@ -21,7 +21,7 @@ type Finished struct {
 	mu       sync.Mutex
 	stop     chan struct{}
 	logger   *log.Logger
-	signal   func([]string)
+	signal   func([]string) error
 	modified map[string]bool
 }
 
@@ -54,7 +54,7 @@ func (t *Finished) Modified(key string, v interface{}, vs map[window.Span][]inte
 	return nil
 }
 
-func (t *Finished) Start(signal func(keys []string)) error {
+func (t *Finished) Start(signal func(keys []string) error) error {
 	t.signal = signal
 	<-t.stop
 	return nil

@@ -71,6 +71,7 @@ func (p *Process) String() string {
 // Run process.
 func (p *Process) Run() error {
 	p.logger.Printf("starting")
+	defer p.logger.Printf("exited")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	eg, ctx := errgroup.WithContext(ctx)
@@ -178,9 +179,16 @@ func (p *Process) runTrig() error {
 	p.logger.Print("trigger running")
 	defer p.logger.Printf("trigger exited")
 
-	signal := func(keys []string) {
-		p.db.Drain(p.ctx, keys, p.sinks[0].Give)
+	signal := func(keys []string) error {
+		for _, sink := range p.sinks {
+			err := p.db.Drain(p.ctx, keys, sink.Give)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
 	}
+
 	return p.def.Trigger().Start(signal)
 }
 

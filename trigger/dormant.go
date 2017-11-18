@@ -43,7 +43,7 @@ func (t *Dormant) Modified(key string, v interface{}, vs map[window.Span][]inter
 }
 
 // Start the trigger, signalling changed keys with the signal function.
-func (t *Dormant) Start(signal func(keys []string)) error {
+func (t *Dormant) Start(signal func(keys []string) error) error {
 	freq := t.after / 100
 	if freq < 1*time.Second {
 		freq = 100 * time.Millisecond
@@ -70,7 +70,10 @@ func (t *Dormant) Start(signal func(keys []string)) error {
 		case <-t.stop:
 			return nil
 		case now := <-t.ticker.C:
-			signal(snapshot(now))
+			err := signal(snapshot(now))
+			if err != nil {
+				return err
+			}
 		}
 	}
 }
