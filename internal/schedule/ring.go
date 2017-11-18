@@ -4,13 +4,14 @@ import "errors"
 import "sort"
 import "hash/fnv"
 import "fmt"
+import "strings"
 
 var (
 	// ErrEmptyTerm when a term of zero peers tries to schedule.
 	ErrEmptyTerm = errors.New("schedule: empty Term")
 )
 
-const ringSize = 64
+const ringSize = 6
 
 // New ring based on term of peer names.
 func New(term []string) (*Ring, error) {
@@ -57,4 +58,20 @@ func (r *Ring) Reducer(key, graphType, graphName string) string {
 	}
 
 	return fmt.Sprintf("worker-%v-%v-%v", peer, graphType, graphName)
+}
+
+func (r *Ring) String() string {
+	sorted := []uint64{}
+	for k := range r.peers {
+		sorted = append(sorted, k)
+	}
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+
+	parts := []string{}
+	for _, k := range sorted {
+		p := r.peers[k]
+		parts = append(parts, fmt.Sprintf("(%0.2d->%v)", k, p))
+	}
+
+	return strings.Join(parts, " ")
 }

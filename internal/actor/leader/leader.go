@@ -96,8 +96,10 @@ func (a *Actor) runPeerWatcher() error {
 	}
 
 	for _, c := range current {
+		def := workerDef(c.Peer())
+		a.logger.Printf("peer watcher: setting required: %v", def.Name)
 		a.tracker.Live(c.Peer())
-		a.tracker.SetRequired(workerDef(c.Peer()))
+		a.tracker.SetRequired(def)
 	}
 
 	for {
@@ -112,8 +114,10 @@ func (a *Actor) runPeerWatcher() error {
 				a.tracker.Dead(e.Peer())
 				a.tracker.UnsetRequired(e.Peer())
 			case grid.EntityFound:
+				def := workerDef(e.Peer())
+				a.logger.Printf("peer watcher: setting required: %v", def.Name)
 				a.tracker.Live(e.Peer())
-				a.tracker.SetRequired(workerDef(e.Peer()))
+				a.tracker.SetRequired(def)
 			}
 		}
 	}
@@ -131,7 +135,7 @@ func (a *Actor) runMailboxWatcher() error {
 		a.tracker.Register(c.Name(), c.Peer())
 	}
 
-	missingTimer := time.NewTimer(500 * time.Millisecond)
+	missingTimer := time.NewTimer(4 * time.Second)
 	defer missingTimer.Stop()
 
 	for {
@@ -139,20 +143,23 @@ func (a *Actor) runMailboxWatcher() error {
 		case <-a.ctx.Done():
 			return nil
 		case <-missingTimer.C:
+			a.logger.Printf("mailbox watcher: checking missing")
 			for _, def := range a.tracker.Missing() {
 				err := a.startActor(def)
 				if err != nil {
-					a.logger.Printf("failed to start actor: %v, error: %v", def.Name, err)
+					a.logger.Printf("mailbox watcher: failed to start actor: %v, error: %v", def.Name, err)
+				} else {
+					a.logger.Printf("mailbox watcher: starting actor: %v", def.Name)
 				}
 			}
 		case e := <-mailboxes:
-			a.logger.Printf("%v", e)
 			switch e.Type {
 			case grid.WatchError:
 				return err
 			case grid.EntityLost:
 				a.tracker.Unregister(e.Name())
 			case grid.EntityFound:
+				a.logger.Printf("mailbox watcher: found mailbox: %v, on peer: %v", e.Name(), e.Peer())
 				a.tracker.Register(e.Name(), e.Peer())
 			}
 		}
@@ -165,7 +172,8 @@ func (a *Actor) runTermWatcher() error {
 
 	var term []string
 	for {
-		<-time.After(5 * time.Second)
+		a.logger.Printf("term watcher: waiting for peers to join")
+		<-time.After(30 * time.Second)
 		for peer := range a.tracker.Peers() {
 			term = append(term, peer)
 		}

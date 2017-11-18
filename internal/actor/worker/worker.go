@@ -91,15 +91,14 @@ func (a *Actor) runTermWatcher() error {
 	propogate := func(v interface{}) {
 		term, ok := v.(*msg.Term)
 		if !ok {
-			a.logger.Printf("unknonw response for term message: %T", v)
+			return
+		}
+		r, err := schedule.New(term.Peers)
+		if err != nil {
+			a.logger.Printf("failed creating ring from term: %v", err)
 		} else {
-			r, err := schedule.New(term.Peers)
-			if err != nil {
-				a.logger.Printf("failed creating ring from term: %v", err)
-			} else {
-				for _, p := range a.procs.AllRunning() {
-					p.SetRing(r)
-				}
+			for _, p := range a.procs.AllRunning() {
+				p.SetRing(r)
 			}
 		}
 	}
@@ -111,7 +110,7 @@ func (a *Actor) runTermWatcher() error {
 			return nil
 		case <-timer.C:
 			res, err := a.send(a.timeout, "leader", &msg.Term{})
-			if err != nil {
+			if err != nil && err.Error() != grid.ErrUnregisteredMailbox.Error() {
 				a.logger.Printf("failed getting term: %v", err)
 			} else {
 				propogate(res)

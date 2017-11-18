@@ -8,6 +8,7 @@ import (
 	"github.com/lytics/flo/internal/codec"
 	"github.com/lytics/flo/internal/msg"
 	"github.com/lytics/flo/source"
+	"github.com/lytics/retry"
 )
 
 func (p *Process) consume(src source.Source) error {
@@ -30,7 +31,10 @@ func (p *Process) consume(src source.Source) error {
 		if err != nil {
 			return err
 		}
-		err = p.process(v)
+		retry.X(3, 10*time.Second, func() bool {
+			err = p.process(v)
+			return err != nil
+		})
 		if err != nil {
 			return err
 		}
@@ -38,7 +42,6 @@ func (p *Process) consume(src source.Source) error {
 }
 
 func (p *Process) process(v interface{}) error {
-	p.logger.Printf("processing event: %T :: %v", v, v)
 	if v == nil {
 		return nil
 	}
@@ -77,6 +80,7 @@ func (p *Process) shuffle(key string, ts time.Time, v interface{}) error {
 		return err
 	}
 	receiver := p.ring.Reducer(key, p.graphType, p.graphName)
+	p.logger.Printf("sending to: %v, event: (%v)", receiver, v)
 	_, err = p.send(10*time.Second, receiver, &msg.Keyed{
 		TS:       ts.Unix(),
 		Key:      key,
