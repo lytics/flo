@@ -17,7 +17,7 @@ import (
 	"github.com/lytics/flo/source"
 	"github.com/lytics/flo/source/linefile"
 	"github.com/lytics/flo/source/md5id"
-	_ "github.com/lytics/flo/storage/driver/memdriver"
+	"github.com/lytics/flo/storage/driver/memdriver"
 	"github.com/lytics/flo/trigger"
 	"github.com/lytics/flo/window"
 )
@@ -32,7 +32,7 @@ func main() {
 	g.Transform(clean)
 	g.Group(word)
 	g.Merger(adder)
-	g.Trigger(trigger.AtPeriod(1 * time.Second))
+	g.Trigger(trigger.AtPeriod(5 * time.Second))
 	g.Into(sink.SkipSetup(funcsink.New(print)))
 
 	// Register our message type, and graph type.
@@ -45,7 +45,10 @@ func main() {
 
 	// Create the flo config, the only required
 	// field is the namespace.
-	cfg := flo.Cfg{Namespace: "example"}
+	cfg := flo.Cfg{
+		Driver:    memdriver.Cfg{},
+		Namespace: "example",
+	}
 
 	// Create the flo client.
 	client, err := flo.NewClient(etcd, cfg)
@@ -86,15 +89,13 @@ func main() {
 }
 
 func clean(v interface{}) ([]graph.Event, error) {
-	line := v.(string)
-	line = strings.Trim(line, "\n.!@#$%^&*()")
-	words := strings.Split(line, " ")
-
+	ln := v.(string)
 	ws := []graph.Event{}
-	for _, w := range words {
+	for _, w := range strings.Split(ln, " ") {
 		if w == "" {
 			continue
 		}
+		w = strings.Trim(w, "\n,;.!@#$%^&*()")
 		msg := &Word{
 			Text:  w,
 			Count: 1,

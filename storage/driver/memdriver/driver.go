@@ -8,8 +8,10 @@ import (
 	"github.com/lytics/flo/storage/driver"
 )
 
+const DriverName = "mem"
+
 func init() {
-	storage.Register("mem", &drvr{})
+	storage.Register(DriverName, &drvr{})
 }
 
 type drvr struct{}

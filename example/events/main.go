@@ -16,7 +16,7 @@ import (
 	"github.com/lytics/flo/sink/funcsink"
 	"github.com/lytics/flo/source"
 	"github.com/lytics/flo/source/jsonfile"
-	_ "github.com/lytics/flo/storage/driver/memdriver"
+	"github.com/lytics/flo/storage/driver/memdriver"
 	"github.com/lytics/flo/trigger"
 	"github.com/lytics/flo/window"
 )
@@ -36,8 +36,8 @@ func main() {
 	g := graph.New()
 	g.From(source.SkipSetup(jsonfile.New(Entry{}, "event.data")))
 	g.Transform(clean)
-	g.Window(window.Sliding(1*time.Hour, 1*time.Hour))
-	g.Trigger(trigger.AtPeriod(10 * time.Second))
+	g.Window(window.Fixed(1 * time.Hour))
+	g.Trigger(trigger.AtPeriod(5 * time.Second))
 	g.Into(sink.SkipSetup(funcsink.New(print)))
 
 	// Register our message type, and graph type.
@@ -50,7 +50,10 @@ func main() {
 
 	// Create the flo config, the only required
 	// field is the namespace.
-	cfg := flo.Cfg{Namespace: "example"}
+	cfg := flo.Cfg{
+		Driver:    memdriver.Cfg{},
+		Namespace: "example",
+	}
 
 	// Create the flo client.
 	client, err := flo.NewClient(etcd, cfg)
