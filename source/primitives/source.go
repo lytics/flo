@@ -2,8 +2,8 @@ package primitives
 
 import (
 	"context"
+	"fmt"
 	"io"
-	"strconv"
 
 	"github.com/lytics/flo/source"
 )
@@ -32,7 +32,16 @@ func (s *Source) Metadata() source.Metadata {
 }
 
 // Init the source.
-func (s *Source) Init() error {
+func (s *Source) Init(checkpoint interface{}) error {
+	cp, ok := checkpoint.(*Checkpoint)
+	if !ok {
+		return fmt.Errorf("primities: checkpoint must be of type primities.Checkpoint, not: %T", checkpoint)
+	}
+	if cp.Name != s.meta.Name {
+		return fmt.Errorf("primities: checkpoint name: %v, different from source name: %v", cp.Name, s.meta.Name)
+	}
+	s.pos = int(cp.Pos)
+
 	return nil
 }
 
@@ -42,19 +51,23 @@ func (s *Source) Stop() error {
 }
 
 // Take next item from source.
-func (s *Source) Take(ctx context.Context) (source.ID, interface{}, error) {
+func (s *Source) Take(ctx context.Context) (*source.Item, error) {
 	select {
 	case <-ctx.Done():
-		return source.NoID, nil, context.DeadlineExceeded
+		return nil, context.DeadlineExceeded
 	default:
 	}
 
 	if s.pos >= len(s.data) {
-		return source.NoID, nil, io.EOF
+		return nil, io.EOF
 	}
 	v := s.data[s.pos]
-	id := source.ID(strconv.Itoa(s.pos))
+	item := source.NewItem(v, &Checkpoint{
+		Name: s.meta.Name,
+		Pos:  int64(s.pos),
+	}, nil)
+
 	s.pos++
 
-	return id, v, nil
+	return item, nil
 }

@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package primitives;
+
+message Checkpoint {
+	int64 Pos = 2;
+	string Name = 1;
+}

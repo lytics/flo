@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"reflect"
-	"strconv"
 	"sync"
 
 	"github.com/lytics/flo/source"
@@ -46,9 +46,17 @@ func (s *Source) Metadata() source.Metadata {
 }
 
 // Init the source.
-func (s *Source) Init() error {
+func (s *Source) Init(checkpoint interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	cp, ok := checkpoint.(*Checkpoint)
+	if !ok {
+		return fmt.Errorf("jsonfile: checkpoint must be of type jsonfile.Checkpoint, not: %T", checkpoint)
+	}
+	if cp.Name != s.meta.Name {
+		return fmt.Errorf("jsonfile: checkpoint name: %v, different from source name: %v", cp.Name, s.meta.Name)
+	}
 
 	if s.f != nil {
 		return nil
@@ -79,22 +87,27 @@ func (s *Source) Stop() error {
 }
 
 // Take next value of the source.
-func (s *Source) Take(ctx context.Context) (source.ID, interface{}, error) {
+func (s *Source) Take(ctx context.Context) (*source.Item, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	select {
 	case <-ctx.Done():
-		return source.NoID, nil, context.DeadlineExceeded
+		return nil, context.DeadlineExceeded
 	default:
 	}
 
 	v := reflect.New(reflect.TypeOf(s.prototype)).Interface()
 	if err := s.stream.Decode(v); err != nil {
-		return source.NoID, nil, err
+		return nil, err
 	}
-	id := source.ID(strconv.Itoa(s.pos))
+
+	item := source.NewItem(v, &Checkpoint{
+		Name: s.meta.Name,
+		Pos:  int64(s.pos),
+	}, nil)
+
 	s.pos++
 
-	return id, v, nil
+	return item, nil
 }

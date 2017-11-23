@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -39,14 +40,6 @@ func (to TimeOrder) String() string {
 		panic("unknown time order")
 	}
 }
-
-// ID of item within the source. Sequential
-// sources should have IDs with a total
-// ordering and increase monotonically.
-type ID string
-
-// NoID when ID is unknown or not defined.
-const NoID = ID("")
 
 // Addressing used by the source.
 type Addressing int
@@ -96,6 +89,51 @@ func (m Metadata) String() string {
 		m.Name, m.Size, m.MinTime, m.MaxTime, m.TimeOrder, m.Addressing)
 }
 
+// NewItem from a source of data. Argument v is the value of the item.
+// Argument c is the checkpoint associated with the item if the item
+// is from a source that uses checkpoints. Argument done is a function
+// used for ack/nack and will be called after the item is processed.
+// Both c and done are optional, and different source types will use
+// them differently.
+func NewItem(v interface{}, c interface{}, done func(bool)) *Item {
+	return &Item{
+		v:    v,
+		c:    c,
+		done: done,
+	}
+}
+
+// Item from a source of data.
+type Item struct {
+	v    interface{}
+	c    interface{}
+	done func(bool)
+	once sync.Once
+}
+
+// Done true is called when the message has been
+// processed, but possibly not sunk. False is
+// passed if the message fails to process.
+func (a *Item) Done(flg bool) {
+	if a.done != nil {
+		a.once.Do(func() { a.done(flg) })
+	}
+}
+
+// Value of item.
+func (a *Item) Value() interface{} {
+	return a.v
+}
+
+// Checkpoint associated with item, if any.
+func (a *Item) Checkpoint() interface{} {
+	return a.c
+}
+
+func (a *Item) String() string {
+	return fmt.Sprintf("value: %v, checkpoint: %v", a.v, a.c)
+}
+
 // Sources of data.
 type Sources interface {
 	Setup(graphType, graphName string, conf []byte) ([]Source, error)
@@ -107,41 +145,33 @@ type Source interface {
 	// up more efficient processing.
 	Metadata() Metadata
 	// Init the source. Init is called just before
-	// a source is actively going to be used.
-	Init() error
+	// a source is actively going to be used. If
+	// checkpoint is non-nil, and the source uses
+	// checkpoints, the source will initialize its
+	// state from the checkpoint.
+	Init(checkpoint interface{}) error
 	// Stop the source and clean up. Stop is only
 	// called if Init has been called.
 	Stop() error
 	// Take next item to consume. When a source
 	// is done it should return io.EOF.
-	Take(context.Context) (ID, interface{}, error)
+	Take(ctx context.Context) (*Item, error)
 }
 
 // SortByMinTime the set of sources. The source's min
 // time will be used for comparison.
 func SortByMinTime(vss []Source) ([]Source, error) {
-	// Range over all source, check their metadata.
-	sorted := []*sortEntry{}
-	for i, vs := range vss {
-		// Append the min time, for sorting, and
-		// the index of the actual source.
-		sorted = append(sorted, &sortEntry{
-			time:  vs.Metadata().MinTime,
-			index: i,
-		})
-	}
+	// Clone vss.
+	sorted := make([]Source, len(vss))
+	copy(sorted, vss)
 
 	// Sort by the min time.
 	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].time.Before(sorted[j].time)
+		return sorted[i].Metadata().MinTime.Before(sorted[j].Metadata().MinTime)
 	})
 
 	// Return the result as just a slice of sources.
-	all := []Source{}
-	for _, s := range sorted {
-		all = append(all, vss[s.index])
-	}
-	return all, nil
+	return sorted, nil
 }
 
 type sortEntry struct {

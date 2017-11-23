@@ -7,12 +7,12 @@ import (
 )
 
 // EventTime of message.
-func (m *Keyed) EventTime() time.Time {
-	return time.Unix(m.TS, 0)
+func (m *Event) EventTime() time.Time {
+	return time.Unix(m.Time, 0)
 }
 
 func init() {
 	grid.Register(Term{})
-	grid.Register(Keyed{})
+	grid.Register(Event{})
 	grid.Register(Progress{})
 }

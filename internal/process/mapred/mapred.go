@@ -154,16 +154,16 @@ func (p *Process) runRed() error {
 			return nil
 		case req := <-p.messages:
 			switch m := req.Msg().(type) {
-			case *msg.Keyed:
+			case *msg.Event:
 				v, err := codec.Unmarshal(m.Data, m.DataType)
 				if err != nil {
 					req.Respond(err)
 					continue
 				}
-				err = p.reduce(graph.KeyedEvent{
-					Time: m.EventTime(),
+				err = p.reduce(graph.Event{
 					Key:  m.Key,
-					Msg:  v,
+					Data: v,
+					Time: m.EventTime(),
 				})
 				if err != nil {
 					req.Respond(err)

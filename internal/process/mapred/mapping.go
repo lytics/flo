@@ -12,7 +12,7 @@ import (
 )
 
 func (p *Process) consume(src source.Source) error {
-	err := src.Init()
+	err := src.Init(nil)
 	if err != nil {
 		return err
 	}
@@ -24,7 +24,7 @@ func (p *Process) consume(src source.Source) error {
 			return nil
 		default:
 		}
-		_, v, err := src.Take(p.ctx)
+		item, err := src.Take(p.ctx)
 		if err == io.EOF {
 			return nil
 		}
@@ -32,7 +32,7 @@ func (p *Process) consume(src source.Source) error {
 			return err
 		}
 		retry.X(3, 10*time.Second, func() bool {
-			err = p.process(v)
+			err = p.process(item)
 			return err != nil
 		})
 		if err != nil {
@@ -41,16 +41,20 @@ func (p *Process) consume(src source.Source) error {
 	}
 }
 
-func (p *Process) process(v interface{}) error {
-	if v == nil {
+func (p *Process) process(item *source.Item) error {
+	if item == nil || item.Value() == nil {
 		return nil
 	}
-	keyedEvents, err := p.transformAndGroupAndWindow(v)
+	events, err := p.def.Transform(item.Value())
 	if err != nil {
 		return err
 	}
-	for _, ke := range keyedEvents {
-		err := p.shuffle(ke.Key, ke.Time, ke.Msg)
+	events, err = p.groupAndWindow(events)
+	if err != nil {
+		return err
+	}
+	for _, e := range events {
+		err := p.shuffle(e)
 		if err != nil {
 			return err
 		}
@@ -58,32 +62,28 @@ func (p *Process) process(v interface{}) error {
 	return nil
 }
 
-func (p *Process) transformAndGroupAndWindow(v interface{}) ([]graph.KeyedEvent, error) {
-	events, err := p.def.Transform(v)
-	if err != nil {
-		return nil, err
-	}
-	var keyedEvents []graph.KeyedEvent
+func (p *Process) groupAndWindow(events []graph.Event) ([]graph.Event, error) {
+	var grouped []graph.Event
 	for _, e := range events {
-		grouped, err := p.def.GroupAndWindowBy(e.ID, e.Time, e.Msg)
+		es, err := p.def.GroupAndWindowBy(e)
 		if err != nil {
 			return nil, err
 		}
-		keyedEvents = append(keyedEvents, grouped...)
+		grouped = append(grouped, es...)
 	}
-	return keyedEvents, nil
+	return grouped, nil
 }
 
-func (p *Process) shuffle(key string, ts time.Time, v interface{}) error {
-	dataType, data, err := codec.Marshal(v)
+func (p *Process) shuffle(e graph.Event) error {
+	dataType, data, err := codec.Marshal(e.Data)
 	if err != nil {
 		return err
 	}
-	receiver := p.ring.Reducer(key, p.graphType, p.graphName)
-	p.logger.Printf("sending to: %v, event: (%v)", receiver, v)
-	_, err = p.send(10*time.Second, receiver, &msg.Keyed{
-		TS:       ts.Unix(),
-		Key:      key,
+	receiver := p.ring.Reducer(e.Key, p.graphType, p.graphName)
+	p.logger.Printf("sending to: %v, event: (%v)", receiver, e.Data)
+	_, err = p.send(10*time.Second, receiver, &msg.Event{
+		Key:      e.Key,
+		Time:     e.Time.Unix(),
 		Data:     data,
 		DataType: dataType,
 	})

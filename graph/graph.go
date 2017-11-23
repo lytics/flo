@@ -11,15 +11,10 @@ import (
 )
 
 type Event struct {
-	Time time.Time   // Event time.
 	ID   string      // Event ID.
-	Msg  interface{} // Event message.
-}
-
-type KeyedEvent struct {
-	Time time.Time   // Event time.
 	Key  string      // Event key.
-	Msg  interface{} // Event message.
+	Data interface{} // Event message.
+	Time time.Time   // Event time.
 }
 
 func New() *Graph {
@@ -104,47 +99,56 @@ func (def *Definition) Transform(v interface{}) ([]Event, error) {
 // value v using the "window by" of the graph. The result is
 // a slice of keyed events, one for each window calcualted.
 // Each window actuall gets the same event.
-func (def *Definition) GroupAndWindowBy(id string, ts time.Time, v interface{}) ([]KeyedEvent, error) {
+func (def *Definition) GroupAndWindowBy(e Event) ([]Event, error) {
 	if def.g.group != nil {
-		key, err := def.g.group(v)
+		// Group by clause exists, use it
+		// to produce the key.
+		key, err := def.g.group(e.Data)
 		if err != nil {
 			return nil, err
 		}
-		return []KeyedEvent{KeyedEvent{
-			Time: ts,
+		return []Event{{
+			ID:   e.ID,
 			Key:  key,
-			Msg:  v,
+			Data: e.Data,
+			Time: e.Time,
 		}}, nil
 	} else if def.g.window != nil {
-		var events []KeyedEvent
-		windows := def.g.window.Apply(ts)
+		// No group by exists, but a window by
+		// clause exists, use the windows as
+		// the event key.
+		var events []Event
+		windows := def.g.window.Apply(e.Time)
 		for _, w := range windows {
 			key := w.String()
-			events = append(events, KeyedEvent{
-				Time: ts,
+			events = append(events, Event{
+				ID:   e.ID,
 				Key:  key,
-				Msg:  v,
+				Data: e.Data,
+				Time: e.Time,
 			})
 		}
 		return events, nil
 	} else {
-		key := id
-		return []KeyedEvent{KeyedEvent{
-			Time: ts,
-			Key:  key,
-			Msg:  v,
+		// No group or window clause exists,
+		// just use the event ID as the key.
+		return []Event{{
+			ID:   e.ID,
+			Key:  e.ID,
+			Data: e.Data,
+			Time: e.Time,
 		}}, nil
 	}
 }
 
 // Merge the new keyed event ke, into existing windows representing
 // the same key.
-func (def *Definition) Merge(e *KeyedEvent, prev window.State) error {
+func (def *Definition) Merge(e *Event, prev window.State) error {
 	f := merger.Cons()
 	if def.g.merger != nil {
 		f = merger.Fold(def.g.merger)
 	}
-	return def.g.window.Merge(e.Time, []interface{}{e.Msg}, prev, f)
+	return def.g.window.Merge(e.Time, []interface{}{e.Data}, prev, f)
 }
 
 // Trigger definition.
