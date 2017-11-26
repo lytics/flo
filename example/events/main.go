@@ -104,7 +104,7 @@ func clean(v interface{}) ([]graph.Event, error) {
 		Data:      e.Data,
 	}
 	return []graph.Event{{
-		Msg:  msg,
+		Data: msg,
 		Time: ts,
 	}}, nil
 }

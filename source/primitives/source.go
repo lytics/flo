@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/lytics/flo/source"
 )
@@ -21,6 +22,7 @@ func FromSlice(name string, data []interface{}) *Source {
 
 // Source of data.
 type Source struct {
+	mu   sync.Mutex
 	pos  int
 	data []interface{}
 	meta source.Metadata
@@ -32,7 +34,10 @@ func (s *Source) Metadata() source.Metadata {
 }
 
 // Init the source.
-func (s *Source) Init(checkpoint interface{}) error {
+func (s *Source) Init(ctx context.Context, checkpoint interface{}) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	cp, ok := checkpoint.(*Checkpoint)
 	if !ok {
 		return fmt.Errorf("primities: checkpoint must be of type primities.Checkpoint, not: %T", checkpoint)
@@ -52,6 +57,9 @@ func (s *Source) Stop() error {
 
 // Take next item from source.
 func (s *Source) Take(ctx context.Context) (*source.Item, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	select {
 	case <-ctx.Done():
 		return nil, context.DeadlineExceeded

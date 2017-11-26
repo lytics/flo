@@ -46,16 +46,21 @@ func (s *Source) Metadata() source.Metadata {
 }
 
 // Init the source.
-func (s *Source) Init(checkpoint interface{}) error {
+func (s *Source) Init(ctx context.Context, checkpoint interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	cp, ok := checkpoint.(*Checkpoint)
-	if !ok {
-		return fmt.Errorf("jsonfile: checkpoint must be of type jsonfile.Checkpoint, not: %T", checkpoint)
-	}
-	if cp.Name != s.meta.Name {
-		return fmt.Errorf("jsonfile: checkpoint name: %v, different from source name: %v", cp.Name, s.meta.Name)
+	var ok bool
+	var cp *Checkpoint
+
+	if checkpoint != nil {
+		cp, ok = checkpoint.(*Checkpoint)
+		if !ok {
+			return fmt.Errorf("jsonfile: checkpoint must be of type jsonfile.Checkpoint, not: %T", checkpoint)
+		}
+		if cp.Name != s.meta.Name {
+			return fmt.Errorf("jsonfile: checkpoint name: %v, different from source name: %v", cp.Name, s.meta.Name)
+		}
 	}
 
 	if s.f != nil {
@@ -68,6 +73,16 @@ func (s *Source) Init(checkpoint interface{}) error {
 	}
 	s.f = f
 	s.stream = json.NewDecoder(bufio.NewReader(s.f))
+
+	if ok {
+		for int64(s.pos) < cp.Pos {
+			_, err := s.take(ctx)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -97,6 +112,11 @@ func (s *Source) Take(ctx context.Context) (*source.Item, error) {
 	default:
 	}
 
+	return s.take(ctx)
+}
+
+// take without locking.
+func (s *Source) take(ctx context.Context) (*source.Item, error) {
 	v := reflect.New(reflect.TypeOf(s.prototype)).Interface()
 	if err := s.stream.Decode(v); err != nil {
 		return nil, err

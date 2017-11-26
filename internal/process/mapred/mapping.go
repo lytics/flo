@@ -12,7 +12,7 @@ import (
 )
 
 func (p *Process) consume(src source.Source) error {
-	err := src.Init(nil)
+	err := src.Init(p.ctx, nil)
 	if err != nil {
 		return err
 	}

@@ -149,7 +149,7 @@ type Source interface {
 	// checkpoint is non-nil, and the source uses
 	// checkpoints, the source will initialize its
 	// state from the checkpoint.
-	Init(checkpoint interface{}) error
+	Init(ctx context.Context, checkpoint interface{}) error
 	// Stop the source and clean up. Stop is only
 	// called if Init has been called.
 	Stop() error
