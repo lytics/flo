@@ -3,12 +3,13 @@ package msg
 import (
 	"time"
 
+	"github.com/lytics/flo/window"
 	"github.com/lytics/grid"
 )
 
 // EventTime of message.
-func (m *Event) EventTime() time.Time {
-	return time.Unix(m.Time, 0)
+func (m *Event) EventTime() window.Span {
+	return window.NewSpan(time.Unix(m.SpanStart, 0), time.Unix(m.SpanEnd, 0))
 }
 
 func init() {

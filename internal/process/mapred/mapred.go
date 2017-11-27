@@ -163,7 +163,7 @@ func (p *Process) runRed() error {
 				err = p.reduce(graph.Event{
 					Key:  m.Key,
 					Data: v,
-					Time: m.EventTime(),
+					Span: m.EventTime(),
 				})
 				if err != nil {
 					req.Respond(err)

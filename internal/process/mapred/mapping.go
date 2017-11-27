@@ -82,10 +82,11 @@ func (p *Process) shuffle(e graph.Event) error {
 	receiver := p.ring.Reducer(e.Key, p.graphType, p.graphName)
 	p.logger.Printf("sending to: %v, event: (%v)", receiver, e.Data)
 	_, err = p.send(10*time.Second, receiver, &msg.Event{
-		Key:      e.Key,
-		Time:     e.Time.Unix(),
-		Data:     data,
-		DataType: dataType,
+		Key:       e.Key,
+		Data:      data,
+		DataType:  dataType,
+		SpanEnd:   e.Span.End(),
+		SpanStart: e.Span.Start(),
 	})
 	return err
 }

@@ -36,7 +36,7 @@ func main() {
 	g := graph.New()
 	g.From(source.SkipSetup(jsonfile.New(Entry{}, "event.data")))
 	g.Transform(clean)
-	g.Window(window.Fixed(1 * time.Hour))
+	g.Window(window.Sliding(1*time.Hour, 2*time.Minute))
 	g.Trigger(trigger.AtPeriod(5 * time.Second))
 	g.Into(sink.SkipSetup(funcsink.New(print)))
 

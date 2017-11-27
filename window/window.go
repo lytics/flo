@@ -17,5 +17,5 @@ type State interface {
 // Window strategy.
 type Window interface {
 	Apply(ts time.Time) []Span
-	Merge(ts time.Time, vs []interface{}, ss State, f merger.ManyMerger) error
+	Merge(s Span, v interface{}, ss State, f merger.ManyMerger) error
 }

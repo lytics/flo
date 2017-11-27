@@ -6,7 +6,8 @@ message Event {
 	string Key = 1;
 	bytes Data = 2;
 	string DataType = 3;
-	int64 Time = 4;
+	int64 SpanStart = 4;
+	int64 SpanEnd = 5;
 	string Graph = 6;
 }
 

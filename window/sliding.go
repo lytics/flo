@@ -47,14 +47,13 @@ func (w *sliding) Apply(ts time.Time) []Span {
 
 // Merge the new value vs into the appropriate existing windows
 // found in ss.
-func (w *sliding) Merge(ts time.Time, vs []interface{}, ss State, f merger.ManyMerger) error {
-	for _, tss := range w.Apply(ts) {
-		vs0 := ss.Get(tss)
-		vs2, err := f(vs, vs0)
-		if err != nil {
-			return err
-		}
-		ss.Set(tss, vs2)
+func (w *sliding) Merge(s Span, v interface{}, ss State, f merger.ManyMerger) error {
+	vs := []interface{}{v}
+	vs0 := ss.Get(s)
+	vs2, err := f(vs, vs0)
+	if err != nil {
+		return err
 	}
+	ss.Set(s, vs2)
 	return nil
 }

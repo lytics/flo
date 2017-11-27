@@ -32,16 +32,14 @@ func (w *session) Apply(ts time.Time) []Span {
 
 // Merge the new value vs into the appropriate existing
 // windows in ss, possibly expanding existing windows.
-func (w *session) Merge(ts time.Time, vs []interface{}, ss State, f merger.ManyMerger) error {
+func (w *session) Merge(s Span, v interface{}, ss State, f merger.ManyMerger) error {
 	var err error
-
-	// Create the session window.
-	s := w.apply(ts)
 
 	// Check each existing window, and if it
 	// overlaps with the new window 's'
 	// merge the two together along with
 	// the data.
+	vs := []interface{}{v}
 	remove := map[Span]bool{}
 	for s0 := range ss.Spans() {
 		vs0 := ss.Get(s0)
