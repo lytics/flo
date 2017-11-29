@@ -102,7 +102,7 @@ func clean(v interface{}) ([]graph.Event, error) {
 		}
 		ws = append(ws, graph.Event{
 			ID:   md5id.FromString(w),
-			Msg:  msg,
+			Data: msg,
 			Time: time.Now(),
 		})
 	}

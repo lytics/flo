@@ -98,7 +98,7 @@ func clean(v interface{}) ([]graph.Event, error) {
 		ws = append(ws, graph.Event{
 			Time: time.Now(),
 			ID:   md5id.FromString(w),
-			Msg: &Word{
+			Data: &Word{
 				Text:  w,
 				Count: 1,
 			},

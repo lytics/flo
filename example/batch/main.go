@@ -99,7 +99,7 @@ func clean(v interface{}) ([]graph.Event, error) {
 	}
 	return []graph.Event{{
 		Time: ts,
-		Msg: &Event{
+		Data: &Event{
 			Timestamp: e.Timestamp,
 			User:      e.User,
 			URL:       e.URL,
