@@ -7,9 +7,14 @@ import (
 	"github.com/lytics/grid"
 )
 
-// EventTime of message.
-func (m *Event) EventTime() window.Span {
-	return window.NewSpan(time.Unix(m.SpanStart, 0), time.Unix(m.SpanEnd, 0))
+// Time of event.
+func (m *Event) Time() time.Time {
+	return time.Unix(m.TimeUnix, 0)
+}
+
+// Window of time the event is associated with.
+func (m *Event) Window() window.Span {
+	return window.NewSpan(time.Unix(m.WindowStartUnix, 0), time.Unix(m.WindowEndUnix, 0))
 }
 
 func init() {

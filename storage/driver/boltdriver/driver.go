@@ -100,7 +100,7 @@ func (c *Conn) Drain(ctx context.Context, keys []string, sink driver.Sink) error
 				return err
 			}
 
-			for s, vs := range row.Spans() {
+			for s, vs := range row.Windows() {
 				err := sink(ctx, s, key, vs)
 				if err != nil {
 					return err

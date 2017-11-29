@@ -49,11 +49,11 @@ func (p *Process) process(item *source.Item) error {
 	if err != nil {
 		return err
 	}
-	events, err = p.groupAndWindow(events)
+	grouped, err := p.groupAndWindow(events)
 	if err != nil {
 		return err
 	}
-	for _, e := range events {
+	for _, e := range grouped {
 		err := p.shuffle(e)
 		if err != nil {
 			return err
@@ -63,15 +63,15 @@ func (p *Process) process(item *source.Item) error {
 }
 
 func (p *Process) groupAndWindow(events []graph.Event) ([]graph.Event, error) {
-	var grouped []graph.Event
+	var windowed []graph.Event
 	for _, e := range events {
-		es, err := p.def.GroupAndWindowBy(e)
+		tmp, err := p.def.GroupAndWindowBy(e)
 		if err != nil {
 			return nil, err
 		}
-		grouped = append(grouped, es...)
+		windowed = append(windowed, tmp...)
 	}
-	return grouped, nil
+	return windowed, nil
 }
 
 func (p *Process) shuffle(e graph.Event) error {
@@ -80,13 +80,14 @@ func (p *Process) shuffle(e graph.Event) error {
 		return err
 	}
 	receiver := p.ring.Reducer(e.Key, p.graphType, p.graphName)
-	p.logger.Printf("sending to: %v, event: (%v)", receiver, e.Data)
+	p.logger.Printf("sending to: %v, event: (%v), window: %v", receiver, e.Data, e.Window)
 	_, err = p.send(10*time.Second, receiver, &msg.Event{
-		Key:       e.Key,
-		Data:      data,
-		DataType:  dataType,
-		SpanEnd:   e.Span.End(),
-		SpanStart: e.Span.Start(),
+		Key:             e.Key,
+		Data:            data,
+		DataType:        dataType,
+		TimeUnix:        e.Time.UTC().Unix(),
+		WindowEndUnix:   e.Window.End().UTC().Unix(),
+		WindowStartUnix: e.Window.Start().UTC().Unix(),
 	})
 	return err
 }

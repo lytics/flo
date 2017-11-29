@@ -11,10 +11,11 @@ import (
 )
 
 type Event struct {
-	ID   string      // Event ID.
-	Key  string      // Event key.
-	Data interface{} // Event message.
-	Time time.Time   // Evant time.
+	ID     string      // Event ID.
+	Key    string      // Event key.
+	Data   interface{} // Event message.
+	Time   time.Time   // Evant time.
+	Window window.Span // Event window.
 }
 
 func New() *Graph {
@@ -100,16 +101,16 @@ func (def *Definition) Transform(v interface{}) ([]Event, error) {
 // a slice of keyed events, one for each window calcualted.
 // Each window actuall gets the same event.
 func (def *Definition) GroupAndWindowBy(e Event) ([]Event, error) {
-
 	var err error
 	var key string
 	var events []Event
 
 	// Calculate window spans.
-	spans := def.g.window.Apply(e.Time)
+	windows := def.g.window.Apply(e.Time)
 
 	// When user defined group function exists,
-	// use it.
+	// use it to group items by generating a
+	// key for the data.
 	if def.g.group != nil {
 		key, err = def.g.group(e.Data)
 		if err != nil {
@@ -118,61 +119,32 @@ func (def *Definition) GroupAndWindowBy(e Event) ([]Event, error) {
 	}
 
 	// Calculate each event.
-	for _, s := range spans {
+	for _, w := range windows {
+		// When no group function is given
+		// by the user, use the window of
+		// time as the key.
 		if def.g.group == nil {
-			key = s.String()
+			key = w.String()
 		}
 		events = append(events, Event{
-			ID:   e.ID,
-			Key:  key,
-			Span: s,
-			Data: e.Data,
+			ID:     e.ID,
+			Key:    key,
+			Data:   e.Data,
+			Time:   e.Time,
+			Window: w,
 		})
 	}
 
-	// if def.g.group != nil {
-	// 	// Group by clause exists, use it
-	// 	// to produce the key.
-	// 	key, err := def.g.group(e.Data)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	return []Event{{
-	// 		ID:   e.ID,
-	// 		Key:  key,
-	// 		Data: e.Data,
-	// 		Time: e.Time,
-	// 	}}, nil
-	// } else if def.g.window != nil {
-	// 	// No group by exists, but a window by
-	// 	// clause exists, use the windows as
-	// 	// the event key.
-	// 	var events []Event
-	// 	windows := def.g.window.Apply(e.Time)
-	// 	for _, w := range windows {
-	// 		key := w.String()
-
-	// 	}
-	// 	return events, nil
-	// } else {
-	// 	// No group or window clause exists,
-	// 	// just use the event ID as the key.
-	// 	return []Event{{
-	// 		ID:   e.ID,
-	// 		Key:  e.ID,
-	// 		Data: e.Data,
-	// 		Time: e.Time,
-	// 	}}, nil
-	// }
+	return events, nil
 }
 
 // Merge the new event, into existing windows representing the same key.
-func (def *Definition) Merge(s window.Span, v interface{}, prev window.State) error {
+func (def *Definition) Merge(w window.Span, v interface{}, prev window.State) error {
 	f := merger.Cons()
 	if def.g.merger != nil {
 		f = merger.Fold(def.g.merger)
 	}
-	return def.g.window.Merge(s, v, prev, f)
+	return def.g.window.Merge(w, v, prev, f)
 }
 
 // Trigger definition.

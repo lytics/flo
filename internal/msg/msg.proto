@@ -3,12 +3,13 @@ syntax = "proto3";
 package msg;
 
 message Event {
-	string Key = 1;
-	bytes Data = 2;
-	string DataType = 3;
-	int64 SpanStart = 4;
-	int64 SpanEnd = 5;
-	string Graph = 6;
+	string Graph = 1;
+	string Key = 2;
+	bytes Data = 3;
+	string DataType = 4;
+	int64 TimeUnix = 5;
+	int64 WindowStartUnix = 6;
+	int64 WindowEndUnix = 7;
 }
 
 message Progress {

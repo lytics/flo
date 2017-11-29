@@ -45,7 +45,7 @@ func (r *Row) Set(k window.Span, v []interface{}) {
 	r.updates[k] = v
 }
 
-func (r *Row) Spans() map[window.Span][]interface{} {
+func (r *Row) Windows() map[window.Span][]interface{} {
 	ss := map[window.Span][]interface{}{}
 	for k, v := range r.updates {
 		ss[k] = v

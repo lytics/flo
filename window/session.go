@@ -30,9 +30,10 @@ func (w *session) Apply(ts time.Time) []Span {
 	return []Span{w.apply(ts)}
 }
 
-// Merge the new value vs into the appropriate existing
-// windows in ss, possibly expanding existing windows.
-func (w *session) Merge(s Span, v interface{}, ss State, f merger.ManyMerger) error {
+// Merge the new value v into the appropriate existing
+// windows in previous state, possibly expanding some
+// existing windows.
+func (w *session) Merge(s Span, v interface{}, prev State, f merger.ManyMerger) error {
 	var err error
 
 	// Check each existing window, and if it
@@ -41,8 +42,8 @@ func (w *session) Merge(s Span, v interface{}, ss State, f merger.ManyMerger) er
 	// the data.
 	vs := []interface{}{v}
 	remove := map[Span]bool{}
-	for s0 := range ss.Spans() {
-		vs0 := ss.Get(s0)
+	for s0 := range prev.Windows() {
+		vs0 := prev.Get(s0)
 		if s.Overlap(s0) {
 			// Merge new data with existing
 			// data for overlapping windows.
@@ -62,12 +63,12 @@ func (w *session) Merge(s Span, v interface{}, ss State, f merger.ManyMerger) er
 	// that have been merged, since
 	// they are no longer valid.
 	for s0 := range remove {
-		ss.Del(s0)
+		prev.Del(s0)
 	}
 
 	// Put the new possibly expanded and
 	// merged session into the map.
-	ss.Set(s, vs)
+	prev.Set(s, vs)
 
 	// Call it good.
 	return nil
