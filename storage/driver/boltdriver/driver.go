@@ -9,6 +9,7 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/lytics/flo/storage"
 	"github.com/lytics/flo/storage/driver"
+	"github.com/lytics/flo/window"
 )
 
 const (
@@ -69,7 +70,7 @@ type Conn struct {
 	bucket string
 }
 
-func (c *Conn) Apply(ctx context.Context, key string, mut driver.Mutation) error {
+func (c *Conn) Apply(ctx context.Context, key string, mut driver.Mutation) (map[window.Span]driver.Update, error) {
 	return c.db.Batch(func(tx *bolt.Tx) error {
 		bk := tx.Bucket(c.bucketKey())
 		rw := newRW(key, bk)
@@ -88,29 +89,29 @@ func (c *Conn) Apply(ctx context.Context, key string, mut driver.Mutation) error
 	})
 }
 
-func (c *Conn) Drain(ctx context.Context, keys []string, sink driver.Sink) error {
-	return c.db.View(func(tx *bolt.Tx) error {
-		bk := tx.Bucket(c.bucketKey())
+// func (c *Conn) Drain(ctx context.Context, keys []string, sink driver.Sink) error {
+// 	return c.db.View(func(tx *bolt.Tx) error {
+// 		// bk := tx.Bucket(c.bucketKey())
 
-		for _, key := range keys {
-			rw := newRW(key, bk)
+// 		// for _, key := range keys {
+// 		// 	rw := newRW(key, bk)
 
-			row, err := driver.NewRow(rw)
-			if err != nil {
-				return err
-			}
+// 		// 	row, err := driver.NewRow(rw)
+// 		// 	if err != nil {
+// 		// 		return err
+// 		// 	}
 
-			for s, vs := range row.Windows() {
-				err := sink(ctx, s, key, vs)
-				if err != nil {
-					return err
-				}
-			}
-		}
+// 		// 	for s, vs := range row.() {
+// 		// 		err := sink(ctx, s, key, vs)
+// 		// 		if err != nil {
+// 		// 			return err
+// 		// 		}
+// 		// 	}
+// 		// }
 
-		return nil
-	})
-}
+// 		return nil
+// 	})
+// }
 
 func (c *Conn) bucketKey() []byte {
 	return []byte(c.bucket)

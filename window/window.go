@@ -8,10 +8,9 @@ import (
 
 // State of a key's windows and associated values.
 type State interface {
-	Del(Span)
 	Get(Span) []interface{}
-	Set(Span, []interface{})
-	Windows() map[Span][]interface{}
+	Spans() []Span
+	Coalesce(Span, []Span, []interface{})
 }
 
 // Window strategy.

@@ -2,6 +2,7 @@ package badgerdriver
 
 import (
 	"github.com/dgraph-io/badger"
+	"github.com/lytics/flo/storage/driver"
 	"github.com/lytics/flo/window"
 )
 
@@ -17,7 +18,7 @@ type rw struct {
 	prefix []byte
 }
 
-func (rw *rw) DelSpan(s window.Span) error {
+func (rw *rw) Del(s window.Span) error {
 	k, err := encodeKey(s, rw)
 	if err != nil {
 		return err
@@ -25,12 +26,12 @@ func (rw *rw) DelSpan(s window.Span) error {
 	return rw.txn.Delete(k)
 }
 
-func (rw *rw) PutSpan(s window.Span, vs []interface{}) error {
+func (rw *rw) Set(s window.Span, rec driver.Record) error {
 	k, err := encodeKey(s, rw)
 	if err != nil {
 		return err
 	}
-	v, err := encodeVal(vs)
+	v, err := encodeVal(rec)
 	if err != nil {
 		return err
 	}
@@ -38,9 +39,9 @@ func (rw *rw) PutSpan(s window.Span, vs []interface{}) error {
 	return rw.txn.Set(k, v, 0)
 }
 
-func (rw *rw) Windows() (map[window.Span][]interface{}, error) {
+func (rw *rw) Snapshot() (map[window.Span]driver.Record, error) {
 	it := rw.txn.NewIterator(badger.DefaultIteratorOptions)
-	snap := map[window.Span][]interface{}{}
+	snap := map[window.Span]driver.Record{}
 	for it.Seek(rw.prefix); it.ValidForPrefix(rw.prefix); it.Next() {
 		item := it.Item()
 		kb := item.Key()
@@ -56,7 +57,7 @@ func (rw *rw) Windows() (map[window.Span][]interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		snap[k] = v
+		snap[k] = *v
 	}
 	return snap, nil
 }

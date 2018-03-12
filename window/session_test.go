@@ -17,7 +17,7 @@ func TestSessionWindow(t *testing.T) {
 	}
 
 	// Session with timeout of 30 minutes.
-	session := Session(30 * time.Minute)
+	win := Session(30 * time.Minute)
 
 	// Merge in the sequence of events. Here nil
 	// data is used, the intent is to check that
@@ -25,9 +25,11 @@ func TestSessionWindow(t *testing.T) {
 	// correctly.
 	ss := newState()
 	for i, ts := range times {
-		err := session.Merge(ts, items(i), ss, appendMerge)
-		if err != nil {
-			t.Fatal(err)
+		for _, s := range win.(*session).Apply(ts) {
+			err := win.Merge(s, item(i), ss, appendMerge)
+			if err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 

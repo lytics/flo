@@ -13,10 +13,12 @@ func TestSlidingWindow(t *testing.T) {
 
 	// Sliding window, where each window is 5 minutes wide
 	// and produced at a period of 2 minutes.
-	sliding := Sliding(5*time.Minute, 2*time.Minute)
+	win := Sliding(5*time.Minute, 2*time.Minute)
 
 	ss := newState()
-	sliding.Merge(ts, items(0), ss, appendMerge)
+	for _, s := range win.(*sliding).Apply(ts) {
+		win.Merge(s, item(0), ss, appendMerge)
+	}
 
 	// Check that both expected windows were produced
 	// from the timestamp.

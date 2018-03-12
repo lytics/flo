@@ -14,19 +14,29 @@ type Driver interface {
 
 // Conn is a handle to a datastore connection.
 type Conn interface {
-	Apply(ctx context.Context, key string, mut Mutation) error
-	Drain(ctx context.Context, keys []string, sink Sink) error
+	Apply(ctx context.Context, key string, mut Mutation) (map[window.Span]Update, error)
+}
+
+// Record of data.
+type Record struct {
+	Clock  int64
+	Count  int64
+	Values []interface{}
+}
+
+// Update manifest.
+type Update struct {
+	Record   Record
+	Span     window.Span
+	Replaces []window.Span
 }
 
 // ReadWriter of single row data.
 type ReadWriter interface {
-	DelSpan(s window.Span) error
-	PutSpan(s window.Span, vs []interface{}) error
-	Windows() (map[window.Span][]interface{}, error)
+	Del(s window.Span) error
+	Set(s window.Span, rec Record) error
+	Snapshot() (map[window.Span]Record, error)
 }
-
-// Sink for data output.
-type Sink func(ctx context.Context, span window.Span, key string, vs []interface{}) error
 
 // Mutation of window state.
 type Mutation func(window.State) error

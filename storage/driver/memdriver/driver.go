@@ -6,6 +6,7 @@ import (
 
 	"github.com/lytics/flo/storage"
 	"github.com/lytics/flo/storage/driver"
+	"github.com/lytics/flo/window"
 )
 
 const DriverName = "mem"
@@ -27,7 +28,7 @@ type Conn struct {
 	data map[string]*rw
 }
 
-func (c *Conn) Apply(ctx context.Context, key string, mut driver.Mutation) error {
+func (c *Conn) Apply(ctx context.Context, key string, mut driver.Mutation) (map[window.Span]driver.Update, error) {
 	c.mu.Lock()
 	rw, ok := c.data[key]
 	if !ok {
@@ -52,38 +53,38 @@ func (c *Conn) Apply(ctx context.Context, key string, mut driver.Mutation) error
 	return row.Flush()
 }
 
-func (c *Conn) Drain(ctx context.Context, keys []string, sink driver.Sink) error {
-	snap := map[string]*rw{}
+// func (c *Conn) Drain(ctx context.Context, keys []string, sink driver.Sink) error {
+// 	snap := map[string]*rw{}
 
-	c.mu.Lock()
-	for _, k := range keys {
-		rw, ok := c.data[k]
-		if ok {
-			snap[k] = rw
-		}
-	}
-	c.mu.Unlock()
+// 	c.mu.Lock()
+// 	for _, k := range keys {
+// 		rw, ok := c.data[k]
+// 		if ok {
+// 			snap[k] = rw
+// 		}
+// 	}
+// 	c.mu.Unlock()
 
-	flush := func(rw *rw) error {
-		rw.mu.Lock()
-		defer rw.mu.Unlock()
+// 	flush := func(rw *rw) error {
+// 		rw.mu.Lock()
+// 		defer rw.mu.Unlock()
 
-		for s, vs := range rw.windows {
-			err := sink(ctx, s, rw.key, vs)
-			if err != nil {
-				return err
-			}
-		}
+// 		for s, rec := range rw.windows {
+// 			err := sink(ctx, s, rw.key, rec.data)
+// 			if err != nil {
+// 				return err
+// 			}
+// 		}
 
-		return nil
-	}
+// 		return nil
+// 	}
 
-	for _, rw := range snap {
-		err := flush(rw)
-		if err != nil {
-			return err
-		}
-	}
+// 	for _, rw := range snap {
+// 		err := flush(rw)
+// 		if err != nil {
+// 			return err
+// 		}
+// 	}
 
-	return nil
-}
+// 	return nil
+// }

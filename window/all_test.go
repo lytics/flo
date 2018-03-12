@@ -11,10 +11,12 @@ func TestAllWindow(t *testing.T) {
 	// All-of-time window. Regardless of which timestamp
 	// this window receives it buckets the timestamp
 	// into the single universal window of time.
-	all := All()
+	win := All()
 
 	ss := newState()
-	all.Merge(ts, items(0), ss, appendMerge)
+	for _, s := range win.(*all).Apply(ts) {
+		win.Merge(s, item(0), ss, appendMerge)
+	}
 
 	// The expected window of time is the single
 	// universal window.

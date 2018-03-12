@@ -2,7 +2,6 @@ package window
 
 import (
 	"sync"
-	"time"
 )
 
 func newState() *state {
@@ -18,29 +17,30 @@ type state struct {
 	Windows  map[Span][]interface{}
 }
 
-func (s *state) Del(k Span) {
-	delete(s.Windows, k)
+// Get value for span s.
+func (st *state) Get(s Span) []interface{} {
+	return st.Windows[s]
 }
 
-func (s *state) Get(k Span) []interface{} {
-	return s.Windows[k]
+// Coalesce span s by settings its value to vs, and
+// removing span set rs.
+func (st *state) Coalesce(s Span, rs []Span, vs []interface{}) {
+	st.Windows[s] = vs
 }
 
-func (s *state) Set(k Span, v []interface{}) {
-	s.Windows[k] = v
-}
-
-func (s *state) Spans() []Span {
-	ss := make([]Span, 0, len(s.Windows))
-	for k := range s.Windows {
-		ss = append(ss, k)
+// Spans of the state.
+func (st *state) Spans() []Span {
+	snap := make([]Span, 0, len(st.Windows))
+	for s := range st.Windows {
+		snap = append(snap, s)
 	}
-	return ss
+	return snap
 }
 
-func (s *state) Snapshot() *state {
+// Snapshot the state.
+func (st *state) Snapshot() *state {
 	n := newState()
-	for k, v := range s.Windows {
+	for k, v := range st.Windows {
 		n.Windows[k] = v
 	}
 	return n
@@ -49,10 +49,6 @@ func (s *state) Snapshot() *state {
 func appendMerge(a, b []interface{}) ([]interface{}, error) {
 	c := append(a, b...)
 	return c, nil
-}
-
-func items(i int) []interface{} {
-	return []interface{}{i}
 }
 
 func item(i int) interface{} {
@@ -79,8 +75,4 @@ func equal(vs, ws []interface{}) bool {
 		}
 	}
 	return true
-}
-
-func clock(t time.Time) string {
-	return t.Format("15:04:05")
 }

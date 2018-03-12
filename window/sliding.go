@@ -48,12 +48,11 @@ func (w *sliding) Apply(ts time.Time) []Span {
 // Merge the new value vs into the appropriate existing windows
 // found in ss.
 func (w *sliding) Merge(s Span, v interface{}, ss State, f merger.ManyMerger) error {
-	vs := []interface{}{v}
 	vs0 := ss.Get(s)
-	vs2, err := f(vs, vs0)
+	vs1, err := f([]interface{}{v}, vs0)
 	if err != nil {
 		return err
 	}
-	ss.Set(s, vs2)
+	ss.Coalesce(s, []Span{}, vs1)
 	return nil
 }

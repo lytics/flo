@@ -6,6 +6,7 @@ import (
 	"cloud.google.com/go/bigtable"
 	"github.com/lytics/flo/storage"
 	"github.com/lytics/flo/storage/driver"
+	"github.com/lytics/flo/window"
 )
 
 func init() {
@@ -14,7 +15,7 @@ func init() {
 
 type drvr struct{}
 
-func (d *drvr) Open(name string) (driver.Conn, error) {
+func (d *drvr) Open(name string, cfg driver.Cfg) (driver.Conn, error) {
 	client, err := bigtable.NewClient(nil, "", "")
 	if err != nil {
 		return nil, err
@@ -28,7 +29,7 @@ type Conn struct {
 	table *bigtable.Table
 }
 
-func (c *Conn) Apply(ctx context.Context, key string, mut driver.Mutation) error {
+func (c *Conn) Apply(ctx context.Context, key string, mut driver.Mutation) (map[window.Span]driver.Update, error) {
 	rw := newRW(key, c.table)
 
 	row, err := driver.NewRow(rw)
@@ -41,14 +42,15 @@ func (c *Conn) Apply(ctx context.Context, key string, mut driver.Mutation) error
 		return err
 	}
 
-	err = row.Flush()
+	man, err = row.Flush()
 	if err != nil {
 		return err
 	}
 
-	return rw.flush()
-}
+	err = rw.flush()
+	if err != nil {
+		return nil, err
+	}
 
-func (c *Conn) Drain(ctx context.Context, keys []string, sink driver.Sink) error {
-	return nil
+	return man, nil
 }

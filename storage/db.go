@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/lytics/flo/storage/driver"
+	"github.com/lytics/flo/window"
 )
 
 var (
@@ -46,11 +47,6 @@ type DB struct {
 }
 
 // Apply the mutation.
-func (db *DB) Apply(ctx context.Context, key string, mut driver.Mutation) error {
+func (db *DB) Apply(ctx context.Context, key string, mut driver.Mutation) (map[window.Span]driver.Update, error) {
 	return db.conn.Apply(ctx, key, mut)
-}
-
-// Drain the keys into the sink.
-func (db *DB) Drain(ctx context.Context, keys []string, sink driver.Sink) error {
-	return db.conn.Drain(ctx, keys, sink)
 }

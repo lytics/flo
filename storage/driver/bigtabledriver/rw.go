@@ -2,6 +2,7 @@ package bigtabledriver
 
 import (
 	"cloud.google.com/go/bigtable"
+	"github.com/lytics/flo/storage/driver"
 	"github.com/lytics/flo/window"
 )
 
@@ -19,7 +20,7 @@ type rw struct {
 	prefix string
 }
 
-func (rw *rw) DelSpan(s window.Span) error {
+func (rw *rw) Del(s window.Span) error {
 	k, err := encodeKey(s)
 	if err != nil {
 		return err
@@ -28,12 +29,12 @@ func (rw *rw) DelSpan(s window.Span) error {
 	return nil
 }
 
-func (rw *rw) PutSpan(s window.Span, vs []interface{}) error {
+func (rw *rw) Set(s window.Span, rec driver.Record) error {
 	k, err := encodeKey(s)
 	if err != nil {
 		return err
 	}
-	v, err := encodeVal(vs)
+	v, err := encodeVal(rec)
 	if err != nil {
 		return err
 	}
@@ -41,13 +42,13 @@ func (rw *rw) PutSpan(s window.Span, vs []interface{}) error {
 	return nil
 }
 
-func (rw *rw) Windows() (map[window.Span][]interface{}, error) {
+func (rw *rw) Snapshot() (map[window.Span]driver.Record, error) {
 	row, err := rw.tbl.ReadRow(nil, rw.prefix)
 	if err != nil {
 		return nil, err
 	}
-	ts := map[window.Span]bigtable.Timestamp{}
-	snap := map[window.Span][]interface{}{}
+	snapTs := map[window.Span]bigtable.Timestamp{}
+	snapVs := map[window.Span]driver.Record{}
 	for _, item := range row[windowFamily] {
 		k, err := decodeKey(item.Column)
 		if err != nil {
@@ -57,12 +58,12 @@ func (rw *rw) Windows() (map[window.Span][]interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		if ts[k] < item.Timestamp {
-			ts[k] = item.Timestamp
-			snap[k] = v
+		if snapTs[k] < item.Timestamp {
+			snapTs[k] = item.Timestamp
+			snapVs[k] = *v
 		}
 	}
-	return snap, nil
+	return snapVs, nil
 }
 
 func (rw *rw) flush() error {

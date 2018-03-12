@@ -32,12 +32,11 @@ func (w *all) Apply(time.Time) []Span {
 // Merge the new value vs into the universal window
 // in ss.
 func (w *all) Merge(s Span, v interface{}, ss State, f merger.ManyMerger) error {
-	vs := []interface{}{v}
 	vs0 := ss.Get(w.universe)
-	vs2, err := f(vs, vs0)
+	vs1, err := f([]interface{}{v}, vs0)
 	if err != nil {
 		return err
 	}
-	ss.Set(w.universe, vs2)
+	ss.Coalesce(w.universe, []Span{}, vs1)
 	return nil
 }

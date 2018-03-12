@@ -41,8 +41,8 @@ func (w *session) Merge(s Span, v interface{}, prev State, f merger.ManyMerger) 
 	// merge the two together along with
 	// the data.
 	vs := []interface{}{v}
-	remove := map[Span]bool{}
-	for s0 := range prev.Windows() {
+	rs := []Span{}
+	for _, s0 := range prev.Spans() {
 		vs0 := prev.Get(s0)
 		if s.Overlap(s0) {
 			// Merge new data with existing
@@ -52,23 +52,16 @@ func (w *session) Merge(s Span, v interface{}, prev State, f merger.ManyMerger) 
 				return err
 			}
 			// Mark old window for removal.
-			remove[s0] = true
+			rs = append(rs, s0)
 			// Expand window, it will
 			// overlap removed window.
 			s = s.Expand(s0)
 		}
 	}
 
-	// Remove the old sessions windows
-	// that have been merged, since
-	// they are no longer valid.
-	for s0 := range remove {
-		prev.Del(s0)
-	}
-
 	// Put the new possibly expanded and
 	// merged session into the map.
-	prev.Set(s, vs)
+	prev.Coalesce(s, rs, vs)
 
 	// Call it good.
 	return nil

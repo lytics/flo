@@ -3,6 +3,8 @@ syntax = "proto3";
 package badgerdriver;
 
 message Vector {
-	string DataType = 1;
-	repeated bytes Data = 2;
+	int64 clock = 1;
+	int64 count = 2;
+	string DataType = 3;
+	repeated bytes Data = 4;
 }

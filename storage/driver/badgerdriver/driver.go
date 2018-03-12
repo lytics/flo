@@ -6,6 +6,7 @@ import (
 	"github.com/dgraph-io/badger"
 	"github.com/lytics/flo/storage"
 	"github.com/lytics/flo/storage/driver"
+	"github.com/lytics/flo/window"
 )
 
 func init() {
@@ -14,7 +15,7 @@ func init() {
 
 type drvr struct{}
 
-func (d *drvr) Open(name string) (driver.Conn, error) {
+func (d *drvr) Open(name string, cfg driver.Cfg) (driver.Conn, error) {
 	db, err := badger.Open(badger.Options{Dir: name, ValueDir: name})
 	if err != nil {
 		return nil, err
@@ -28,7 +29,7 @@ type Conn struct {
 	db *badger.DB
 }
 
-func (c *Conn) Apply(ctx context.Context, key string, mut driver.Mutation) error {
+func (c *Conn) Apply(ctx context.Context, key string, mut driver.Mutation) (map[window.Span]driver.Update, error) {
 	return c.db.Update(func(txn *badger.Txn) error {
 		rw := newRW(key, txn)
 
@@ -44,8 +45,4 @@ func (c *Conn) Apply(ctx context.Context, key string, mut driver.Mutation) error
 
 		return row.Flush()
 	})
-}
-
-func (c *Conn) Drain(ctx context.Context, keys []string, sink driver.Sink) error {
-	return nil
 }

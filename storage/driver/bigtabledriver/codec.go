@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/lytics/flo/storage/driver"
 	"github.com/lytics/flo/window"
 	"github.com/lytics/grid/codec"
 )
@@ -17,10 +18,13 @@ func decodeKey(kb string) (window.Span, error) {
 	return window.NewSpanFromKey([]byte(kb))
 }
 
-func encodeVal(vs []interface{}) ([]byte, error) {
-	vec := &Vector{}
+func encodeVal(rec driver.Record) ([]byte, error) {
+	vec := &Vector{
+		Clock: rec.Clock,
+		Count: rec.Count,
+	}
 	dataType := ""
-	for _, v := range vs {
+	for _, v := range rec.Values {
 		datumType, datum, err := codec.Marshal(v)
 		if err != nil {
 			return nil, err
@@ -38,21 +42,25 @@ func encodeVal(vs []interface{}) ([]byte, error) {
 	return proto.Marshal(vec)
 }
 
-func decodeVal(vb []byte) ([]interface{}, error) {
+func decodeVal(vb []byte) (*driver.Record, error) {
 	vec := &Vector{}
 	err := proto.Unmarshal(vb, vec)
 	if err != nil {
 		return nil, err
 	}
 
-	res := []interface{}{}
+	values := []interface{}{}
 	for _, e := range vec.Data {
 		v, err := codec.Unmarshal(e, vec.DataType)
 		if err != nil {
 			return nil, err
 		}
-		res = append(res, v)
+		values = append(values, v)
 	}
 
-	return res, nil
+	return &driver.Record{
+		Clock:  vec.Clock,
+		Count:  vec.Count,
+		Values: values,
+	}, nil
 }
